@@ -39,8 +39,8 @@
 .PARAMETER Log
     Enables logging of the installation/removal process
 
-.PARAMETER beta
-    Use the beta version of the installer from Evo’s servers
+.PARAMETER Beta
+    Use the beta version of the installer from Evo s servers
 
 .PARAMETER Help
     Displays usage information
@@ -106,7 +106,7 @@ param(
 
     [Parameter(ParameterSetName='JsonConfig')]
     [Parameter(ParameterSetName='CommandLineConfig')]
-    [switch] $beta,
+    [switch] $Beta,
 
     [Parameter(ParameterSetName='RemoveConfig')]
     [switch] $Remove,
@@ -166,7 +166,7 @@ Parameters:
   -Remove                 Uninstall agent
   -Interactive            Show UI for install/uninstall
   -Log                    Enable installer logging
-  -beta                   Use beta release
+  -Beta                   Use beta release
   -Help                   Show this message
   -Json                   (Legacy) Accept a JSON blob or path to a config file
 
@@ -231,10 +231,10 @@ function GetInstalledSoftware($DisplayNames)
 function GetBaseUrlAndInfoUrl {
     [CmdletBinding()]
     param (
-        [switch] $beta
+        [switch] $Beta
     )
 
-    $mid = if ($beta) { 'beta' } else { 'release' }
+    $mid = if ($Beta) { 'beta' } else { 'release' }
 
     $BaseUrl = "https://download.evosecurity.com/$mid/credpro/"
     $LatestInfoUrl = $BaseUrl + "credential-provider-latest-info.json" 
@@ -823,7 +823,7 @@ Write-Verbose "ParamMap: $($ParamMap.Keys)"
 
 $MSIParams = MakeMsiExecArgs $ParamMap
 
-$BaseUrl, $InfoUrl = GetBaseUrlAndInfoUrl -beta:$beta
+$BaseUrl, $InfoUrl = GetBaseUrlAndInfoUrl -beta:$Beta
 
 if (-not $ParamMap.MSIPath) { ### we have to download the file ...
 
