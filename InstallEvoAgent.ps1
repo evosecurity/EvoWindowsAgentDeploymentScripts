@@ -20,15 +20,40 @@
 
 .PARAMETER CredentialMode
     Login mode. One of: SecureLogin, ElevatedLogin, SecureAndElevatedLogin
+    The installer defaults to SecureAndElevatedLogin on a new installation, or defaults to the previous value on an upgrade
 
 .PARAMETER OnlyEvoLoginCredential
     Set to $true to make Evo the sole credential provider
+
+.PARAMETER FailSafeUser
+    Optional username to use as a fallback if Evo login fails
+
+.PARAMETER MFATimeOut
+    Optional grace period to not require MFA for an unlock (in minutes from previous MFA prompt)
+
+.PARAMETER RememberLastUserName
+    Optional flag to remember the last username used
+
+.PARAMETER DisableUpdate
+    Optional flag to disable auto updates
+
+.PARAMETER JitMode
+    Optional flag to enable Just-In-Time admin accounts
+
+.PARAMETER EndUserElevation
+    Optional flag to enable end-user elevation
+
+.PARAMETER UserAdminEscalation
+    Optional flag to prompt admins with the end-user elevation prompt instead of the standard UAC prompt
+
+.PARAMETER NoElevatedRDP
+    Optional flag to disable elevation for RDP sessions when Evo is the sole login agent
 
 .PARAMETER MSIPath
     Optional path to a .msi or .zip file. If omitted, the latest version is downloaded.
 
 .PARAMETER Upgrade
-    If specified, will validate that the new version is newer than the installed one
+    If specified, will only install a newer version over a previously installed version
 
 .PARAMETER Remove
     Uninstalls the Evo Credential Provider
@@ -97,6 +122,9 @@ param(
     [Parameter(ParameterSetName='CommandLineConfig')]
     [Nullable[int]] [ValidateSet(0, 1)] $UserAdminEscalation,
 
+    [Parameter(ParameterSetName='CommandLineConfig')]
+    [Nullable[int]] [ValidateSet(0, 1)] $RememberLastUserName,
+
     [Parameter(ParameterSetName='CommandLineConfig', HelpMessage='Leave blank to download latest. Otherwise path to MSI or zip file to install')]
     [string] $MSIPath,
 
@@ -141,8 +169,8 @@ Usage Examples:
   Install:
     .\Install-EvoAgent.ps1 -EnvironmentUrl "https://myorg.evosecurity.com" -EvoDirectory "MyOrg" -AccessToken "abc123" -Secret "xyz789"
 
-  Install with logging and upgrade:
-    .\Install-EvoAgent.ps1 -EnvironmentUrl "..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -CredentialMode "SecureLogin" -Upgrade -Log
+  Install with logging and upgrade (uses existing settings):
+    .\Install-EvoAgent.ps1 -Upgrade -Log
 
   Remove:
     .\Install-EvoAgent.ps1 -Remove -Interactive -Log
@@ -159,8 +187,16 @@ Parameters:
   -EvoDirectory           Organization/tenant name
   -AccessToken            API token
   -Secret                 API secret
-  -CredentialMode         SecureLogin | ElevatedLogin | SecureAndElevatedLogin
-  -OnlyEvoLoginCredential Use Evo as sole credential provider
+  -FailSafeUser           Optional username to use as a fallback if Evo login fails
+  -MFATimeOut             Optional grace period to not require MFA for an unlock (in minutes from previous MFA prompt)
+  -CredentialMode         SecureLogin | ElevatedLogin | SecureAndElevatedLogin (defaults to SecureAndElevatedLogin or value of previous install)
+  -OnlyEvoLoginCredential Use Evo as sole credential provider (defaults to false or value of previous install)
+  -RememberLastUserName   Optional flag to remember the last username used (defaults on or value of previous install)
+  -DisableUpdate          Optional flag to disable auto updates (defaults off or value of previous install)
+  -JitMode                Optional flag to enable Just-In-Time admin accounts (defaults off or value of previous install)
+  -EndUserElevation       Optional flag to enable end-user elevation (defaults off or value of previous install)
+  -UserAdminEscalation    Optional flag to prompt admins with the end-user elevation prompt instead of the standard UAC prompt (defaults off or value of previous install)
+  -NoElevatedRDP          Optional flag to disable elevation for RDP sessions when Evo is the sole login agent (defaults on or value of previous install)
   -MSIPath                Optional .msi or .zip file path
   -Upgrade                Validate version is newer before installing
   -Remove                 Uninstall agent
@@ -174,6 +210,8 @@ Notes:
 ------
   - Requires elevation (admin) unless using -Interactive
   - You can also pass a legacy JSON config via -Json
+  - For a new install, the only required values are -EnvironmentUrl, -EvoDirectory, -AccessToken, and -Secret (or those values in the -Json payload)
+  - For an upgrade, the installer will inherit all the values from the previous install unless specified otherwise
 "@ | Write-Host
     exit
 }
@@ -513,6 +551,13 @@ function ParamMapFromJson {
         $ParamMap["USER_ADMIN_ESCALATION"] = 0
     }
 
+    if ($config.RememberLastUserName -eq 1) {
+        $ParamMap["ENABLE_LAST_USERNAME"] = 1
+    }
+    elseif ($config.RememberLastUserName -eq 0) {
+        $ParamMap["ENABLE_LAST_USERNAME"] = 0
+    }
+
     # trim string values in ParamMap
     foreach ($key in $ParamMap.Keys.Clone()) {
         $val = $ParamMap[$key]
@@ -801,6 +846,9 @@ if (-not $Json) {
     }
     if ($null -ne $UserAdminEscalation) {
         $MapForJson += @{ UserAdminEscalation = $UserAdminEscalation}
+    }
+    if ($null -ne $RememberLastUserName) {
+        $MapForJson += @{ RememberLastUserName = $RememberLastUserName}
     }
     if ($MSIPath) {
         $MapForJson += @{ MSIPath = $MSIPath}

@@ -20,22 +20,34 @@ This repository contains a PowerShell script to install, upgrade, or remove the 
 
 ## 🔧 Parameters
 
-| Parameter                 | Description                                                   |
-| ------------------------- | ------------------------------------------------------------- |
-| `-EnvironmentUrl`         | Evo portal base URL (e.g., `https://yourorg.evosecurity.com`) |
-| `-EvoDirectory`           | Your Evo organization/directory name                          |
-| `-AccessToken`            | Evo API access token                                          |
-| `-Secret`                 | Evo API secret                                                |
-| `-CredentialMode`         | `SecureLogin`, `ElevatedLogin`, or `SecureAndElevatedLogin`   |
-| `-OnlyEvoLoginCredential` | If true, Evo becomes the only credential provider             |
-| `-MSIPath`                | Optional path to `.msi` or `.zip` file                        |
-| `-Upgrade`                | Ensure only newer versions replace installed ones             |
-| `-Remove`                 | Uninstalls the Evo Credential Provider                        |
-| `-Interactive`            | Runs installer with UI instead of silent mode                 |
-| `-Log`                    | Enables install/uninstall logging                             |
-| `-Beta`                   | Pulls installer from Evo's beta channel                       |
-| `-Json`                   | Legacy option to supply a JSON config blob or file            |
-| `-Help`                   | Displays built-in help text                                   |
+| Parameter                 | Description                                                   | Default                                     |
+| ------------------------- | ------------------------------------------------------------- | ------------------------------------------- |
+| `-EnvironmentUrl`         | Evo portal base URL (e.g., `https://yourorg.evosecurity.com`) |                                             |
+| `-EvoDirectory`           | Your Evo organization/directory name                          |                                             |
+| `-AccessToken`            | Evo API access token                                          |                                             |
+| `-Secret`                 | Evo API secret                                                |                                             |
+| `-FailSafeUser`           | Optional username to use as a fallback if Evo login fails     |                                             |
+| `-MFATimeOut`             | Optional grace period to not require MFA for an unlock (in minutes from previous MFA prompt) | 0            |
+| `-CredentialMode`         | `SecureLogin`, `ElevatedLogin`, or `SecureAndElevatedLogin`   | SecureAndElevatedLogin                      |
+| `-OnlyEvoLoginCredential` | If set, Evo becomes the only credential provider              | 0                                           |
+| `-RememberLastUserName`   | Optional flag to remember the last username used              | 1                                           |
+| `-DisableUpdate`          | Optional flag to disable auto updates                         | 0                                           |
+| `-JitMode`                | Optional flag to enable Just-In-Time admin accounts           | 0                                           |
+| `-EndUserElevation`       | Optional flag to enable end-user elevation                    | 0                                           |
+| `-UserAdminEscalation`    | Optional flag to prompt admins with the end-user elevation prompt instead of the standard UAC prompt | 0    |
+| `-NoElevatedRDP`          | Optional flag to disable elevation for RDP sessions when Evo is the sole login agent | 1                    |
+| `-MSIPath`                | Optional path to `.msi` or `.zip` file                        |                                             |
+| `-Upgrade`                | Ensure only newer versions replace installed ones             |                                             |
+| `-Remove`                 | Uninstalls the Evo Credential Provider                        |                                             |
+| `-Interactive`            | Runs installer with UI instead of silent mode                 |                                             |
+| `-Log`                    | Enables install/uninstall logging                             |                                             |
+| `-Beta`                   | Pulls installer from Evo's beta channel                       |                                             |
+| `-Json`                   | Legacy option to supply a JSON config blob or file            |                                             |
+| `-Help`                   | Displays built-in help text                                   |                                             |
+
+
+`-EnvironmentUrl`, `-EvoDirectory`, `-AccessToken`, and `-Secret` parameters are required except on upgrades or removal.\
+When upgrading, any unspecified parameters are inherited from the previous install.
 
 ---
 
@@ -50,7 +62,7 @@ This repository contains a PowerShell script to install, upgrade, or remove the 
 ### With Upgrade Check and Logging
 
 ```powershell
-.\Install-EvoAgent.ps1 -EnvironmentUrl "..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -CredentialMode "SecureLogin" -Upgrade -Log
+.\Install-EvoAgent.ps1 -Upgrade -Log
 ```
 
 ### Removal
@@ -63,6 +75,12 @@ This repository contains a PowerShell script to install, upgrade, or remove the 
 
 ```powershell
 .\Install-EvoAgent.ps1 -Json '{ "EnvironmentUrl": "...", "EvoDirectory": "...", "AccessToken": "...", "Secret": "..." }'
+```
+
+### Legacy JSON File
+
+```powershell
+.\Install-EvoAgent.ps1 -Json 'c:\path\to\install.json'
 ```
 
 ---
