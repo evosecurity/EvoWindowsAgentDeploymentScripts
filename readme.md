@@ -50,7 +50,7 @@ This repository contains a PowerShell script to install, upgrade, or remove the 
 ### With Upgrade Check and Logging
 
 ```powershell
-.\Install-EvoAgent.ps1 -EnvironmentUrl "..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -CredentialMode "SecureLogin" -Upgrade -Log
+.\Install-EvoAgent.ps1 -Upgrade -Log
 ```
 
 ### Removal

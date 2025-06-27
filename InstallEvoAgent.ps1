@@ -97,6 +97,9 @@ param(
     [Parameter(ParameterSetName='CommandLineConfig')]
     [Nullable[int]] [ValidateSet(0, 1)] $UserAdminEscalation,
 
+    [Parameter(ParameterSetName='CommandLineConfig')]
+    [Nullable[int]] [ValidateSet(0, 1)] $RememberLastUserName,
+
     [Parameter(ParameterSetName='CommandLineConfig', HelpMessage='Leave blank to download latest. Otherwise path to MSI or zip file to install')]
     [string] $MSIPath,
 
@@ -141,8 +144,8 @@ Usage Examples:
   Install:
     .\Install-EvoAgent.ps1 -EnvironmentUrl "https://myorg.evosecurity.com" -EvoDirectory "MyOrg" -AccessToken "abc123" -Secret "xyz789"
 
-  Install with logging and upgrade:
-    .\Install-EvoAgent.ps1 -EnvironmentUrl "..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -CredentialMode "SecureLogin" -Upgrade -Log
+  Install with logging and upgrade (uses existing settings):
+    .\Install-EvoAgent.ps1 -Upgrade -Log
 
   Remove:
     .\Install-EvoAgent.ps1 -Remove -Interactive -Log
@@ -513,6 +516,13 @@ function ParamMapFromJson {
         $ParamMap["USER_ADMIN_ESCALATION"] = 0
     }
 
+    if ($config.RememberLastUserName -eq 1) {
+        $ParamMap["ENABLE_LAST_USERNAME"] = 1
+    }
+    elseif ($config.RememberLastUserName -eq 0) {
+        $ParamMap["ENABLE_LAST_USERNAME"] = 0
+    }
+
     # trim string values in ParamMap
     foreach ($key in $ParamMap.Keys.Clone()) {
         $val = $ParamMap[$key]
@@ -801,6 +811,9 @@ if (-not $Json) {
     }
     if ($null -ne $UserAdminEscalation) {
         $MapForJson += @{ UserAdminEscalation = $UserAdminEscalation}
+    }
+    if ($null -ne $RememberLastUserName) {
+        $MapForJson += @{ RememberLastUserName = $RememberLastUserName}
     }
     if ($MSIPath) {
         $MapForJson += @{ MSIPath = $MSIPath}
