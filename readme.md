@@ -75,15 +75,6 @@ This repository contains a PowerShell script to install, upgrade, or remove the 
 
 ---
 
-## 📁 Repository Structure
-
-```
-Install-EvoAgent.ps1       # Main script
-README.md                  # This file
-```
-
----
-
 ## 📬 Support
 
 Please contact [support@evosecurity.com](mailto\:support@evosecurity.com) for assistance.
@@ -92,5 +83,5 @@ Please contact [support@evosecurity.com](mailto\:support@evosecurity.com) for as
 
 ## 📝 License
 
-Copyright © Evo Security. All rights reserved.
+Copyright © Evo Security Technologies. All rights reserved.
 
