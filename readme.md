@@ -1,5 +1,6 @@
 # Evo Credential Provider Installer (v2.3+ Only)
 
+
 This repository contains a PowerShell script to install, upgrade, or remove the **Evo Credential Provider** on Windows systems. It supports both **interactive** and **silent** operation modes, enabling easy integration into manual admin workflows or automated deployment systems (e.g., RMM tools, Intune, GPO, etc.).
 
 ---
