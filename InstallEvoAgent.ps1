@@ -46,6 +46,13 @@
 .PARAMETER UserAdminEscalation
     Optional flag to prompt admins with the end-user elevation prompt instead of the standard UAC prompt
 
+.PARAMETER CustomPrompt
+	Optional path to a custom login prompt label
+
+.PARAMETER CustomImage
+	Optional path to a custom login prompt image can be URL or local file path. Must be PNG, JPEG, or Bitmap.
+    Recommended size is 192x192 with no transparency
+
 .PARAMETER NoElevatedRDP
     Optional flag to disable elevation for RDP sessions when Evo is the sole login agent
 
@@ -131,6 +138,12 @@ param(
     [Parameter(ParameterSetName='JsonConfig')]
     [Parameter(ParameterSetName='CommandLineConfig', DontShow=$true)]
     [hashtable] $Dictionary,
+	
+    [Parameter(ParameterSetName='CommandLineConfig')]
+	[string] $CustomPrompt,
+	
+    [Parameter(ParameterSetName='CommandLineConfig')]
+	[string] $CustomImage,
 
     [Parameter(ParameterSetName='JsonConfig')]
     [Parameter(ParameterSetName='CommandLineConfig')]
@@ -196,6 +209,8 @@ Parameters:
   -JitMode                Optional flag to enable Just-In-Time admin accounts (defaults off or value of previous install)
   -EndUserElevation       Optional flag to enable end-user elevation (defaults off or value of previous install)
   -UserAdminEscalation    Optional flag to prompt admins with the end-user elevation prompt instead of the standard UAC prompt (defaults off or value of previous install)
+  -CustomPrompt           Optional path to a custom login prompt label
+  -CustomImage            Optional path to a custom login prompt image
   -NoElevatedRDP          Optional flag to disable elevation for RDP sessions when Evo is the sole login agent (defaults on or value of previous install)
   -MSIPath                Optional .msi or .zip file path
   -Upgrade                Validate version is newer before installing
@@ -480,17 +495,12 @@ function CredProParamMapFromConfig {
     return $ParamMap
 }
 
-function ParamMapFromJson {
+function GetJsonRawContent {
     [CmdletBinding()]
     param (
         [string] $JsonConfig
     )
-    
-    $ParamMap = @{}
-    if (-not $JsonConfig) {
-        return $BuiltUpInstallerMap
-    }
-
+	
     $JsonConfig = $JsonConfig.Trim(" `r`n") # trim all leading/trailing spaces and CR/LF
     Write-Verbose "Trimmed `$JsonConfig: $JsonConfig"
     if ($JsonConfig.StartsWith('{') -and $JsonConfig.EndsWith('}')) {
@@ -507,6 +517,21 @@ function ParamMapFromJson {
     else {
         $rawContent = $JsonConfig
     }
+	return $rawContent
+}
+
+function ParamMapFromJson {
+    [CmdletBinding()]
+    param (
+        [string] $JsonConfig
+    )
+    
+    $ParamMap = @{}
+    if (-not $JsonConfig) {
+        return $BuiltUpInstallerMap
+    }
+
+	$rawContent = GetJsonRawContent $JsonConfig
 
     Write-Verbose "RawContent: $rawContent"
     try {
@@ -783,6 +808,89 @@ function Get-MSIVersion {
     }
 }
 
+function GetServiceLocation {
+	param (
+		[string] $ServiceName
+	)
+	
+	$Item = Get-ItemProperty "hklm:\System\CurrentControlSet\Services\$ServiceName" 'ImagePath' -ErrorAction Ignore
+	return ($Item.ImagePath).Trim('"') # can be wrapped in quotes which we want to remove
+}
+
+function SetCustomPrompt {
+    param (
+        [string]$CustomPrompt
+    )
+
+	Write-Verbose "CustomPrompt: $CustomPrompt"
+	if (-not $CustomPrompt) { return }
+	
+	if (-not (IsRunningAsAdministrator)) {
+		Write-Error "Must be running as an administrator to set a custom prompt"
+		return
+	}
+	
+	Set-ItemProperty 'HKLM:\software\EvoSecurity\EvoLogin-CP' 'login_text' $CustomPrompt
+}
+
+function SetCustomImage {
+    param (
+        [string] $CustomImage,
+		[string] $AgentDirectory
+    )
+	
+	Write-Verbose "CustomImage: $CustomImage, AgentDirectory: $AgentDirectory"
+	if (-not $CustomImage -or -not $AgentDirectory) { return }
+	
+	if (-not (IsRunningAsAdministrator)) {
+		Write-Error "Must be running as an administrator to set a custom image"
+		return
+	}
+	
+	if (Test-Path $CustomImage) {
+		Set-ItemProperty 'HKLM:\software\EvoSecurity\EvoLogin-CP' 'v1_bitmap_path' $CustomImage
+	} else {
+		$GoodUri = [uri]::IsWellFormedUriString($CustomImage, 'Absolute') -and ([uri] $CustomImage).Scheme -in 'http', 'https'
+		if (-not $GoodUri) {
+			Write-Error "The supplied CustomImage parameter $CustomImage is neither a valid file path nor URL"
+			return
+		}
+	
+        try {
+		    $WebContent = Invoke-WebRequest -uri $CustomImage -UseBasicParsing
+		    $bytes = $WebContent.Content
+        } catch {
+			Write-Error "Unable to download image from $CustomImage"
+			return
+        }
+
+        if (-not $bytes -or $bytes.length -lt 4) {
+			Write-Error "Unable to download image from $CustomImage"
+			return
+        }
+		
+		$FileExt = $null
+		if ($bytes[0] -eq 0x89 -and $bytes[1] -eq 0x50 -and $bytes[2] -eq 0x4E -and $bytes[3] -eq 0x47) {
+            $FileExt = ".png"
+        }
+        elseif ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xD8) {
+            $FileExt = ".jpg"
+        }
+        elseif ($bytes[0] -eq 0x42 -and $bytes[1] -eq 0x4D) {
+            $FileExt = ".bmp"
+        }
+		
+		if (-not $FileExt) {
+			Write-Error "$CustomImage is not a valid image format (PNG, JPEG, or Bitmap)"
+			return
+		}
+		
+		$CustomImageFileName = Join-Path $AgentDirectory ("CustomImage" + $FileExt)
+		Set-Content -value $bytes -path $CustomImageFileName -Encoding byte
+		Set-ItemProperty 'hklm:\software\EvoSecurity\EvoLogin-CP' 'v1_bitmap_path' $CustomImageFileName
+	}
+}
+
 
 ####################  Execution starts here  ####################
 
@@ -853,6 +961,14 @@ if (-not $Json) {
     if ($MSIPath) {
         $MapForJson += @{ MSIPath = $MSIPath}
     }
+	
+	if ($CustomImage) {
+		$MapForJson += @{ CustomImage = $CustomImage}
+	}
+	
+	if ($CustomPrompt) {
+		$MapForJson += @{ CustomPrompt = $CustomPrompt}
+	}
 
     $Json = ConvertTo-Json $MapForJson
 
@@ -938,6 +1054,19 @@ try {
         LogFileName = if ($Log) { GetLogFileName $ProductType $true } else { "" }
     }
     InstallMSI @InstallMSIArgs
+	
+	$AgentLocation = GetServiceLocation 'EvoSecureLoginAgent'
+	Write-Verbose "AgentLocation: $AgentLocation"
+	if (Test-Path $AgentLocation) {
+		$AgentDirectory = (Get-Item $AgentLocation).DirectoryName
+		$JsonMap = ConvertFrom-Json (GetJsonRawContent $json)
+		
+		SetCustomPrompt $JsonMap.CustomPrompt
+		SetCustomImage $JsonMap.CustomImage $AgentDirectory
+	} else {
+		Write-Error "Could not find agent location"
+	}
+	
 }
 finally {
     if ($TempMsiFile -and (Test-Path $TempMsiFile)) {

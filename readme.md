@@ -35,6 +35,8 @@ This repository contains a PowerShell script to install, upgrade, or remove the 
 | `-JitMode`                | Optional flag to enable Just-In-Time admin accounts           | 0                                           |
 | `-EndUserElevation`       | Optional flag to enable end-user elevation                    | 0                                           |
 | `-UserAdminEscalation`    | Optional flag to prompt admins with the end-user elevation prompt instead of the standard UAC prompt | 0    |
+| `-CustomPrompt`           | Optional string to customize the login prompt                 |                                             |
+| `-CustomImage`            | Optional path to custom login image (URL or local file path   |                                             |
 | `-NoElevatedRDP`          | Optional flag to disable elevation for RDP sessions when Evo is the sole login agent | 1                    |
 | `-MSIPath`                | Optional path to `.msi` or `.zip` file                        |                                             |
 | `-Upgrade`                | Ensure only newer versions replace installed ones             |                                             |
