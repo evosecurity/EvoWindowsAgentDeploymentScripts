@@ -848,7 +848,12 @@ function SetCustomImage {
 	}
 	
 	if (Test-Path $CustomImage) {
-		Set-ItemProperty 'HKLM:\software\EvoSecurity\EvoLogin-CP' 'v1_bitmap_path' $CustomImage
+	if (-not (Test-Path 'HKLM:\software\EvoSecurity\EvoLogin-CP')) {
+		Write-Error "Registry key 'HKLM:\software\EvoSecurity\EvoLogin-CP' does not exist. Ensure the agent is properly installed."
+		return
+	}
+	
+	Set-ItemProperty 'HKLM:\software\EvoSecurity\EvoLogin-CP' 'v1_bitmap_path' $CustomImage
 	} else {
 		$GoodUri = [uri]::IsWellFormedUriString($CustomImage, 'Absolute') -and ([uri] $CustomImage).Scheme -in 'http', 'https'
 		if (-not $GoodUri) {
