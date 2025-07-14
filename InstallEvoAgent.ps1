@@ -830,6 +830,11 @@ function SetCustomPrompt {
 		return
 	}
 	
+	if (-not (Test-Path 'HKLM:\software\EvoSecurity\EvoLogin-CP')) {
+		Write-Error "Registry key 'HKLM:\software\EvoSecurity\EvoLogin-CP' does not exist. Ensure the agent is properly installed."
+		return
+	}
+	
 	Set-ItemProperty 'HKLM:\software\EvoSecurity\EvoLogin-CP' 'login_text' $CustomPrompt
 }
 
