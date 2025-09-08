@@ -56,6 +56,9 @@
 .PARAMETER NoElevatedRDP
     Optional flag to disable elevation for RDP sessions when Evo is the sole login agent
 
+.PARAMETER UACExtension
+    Optional setting to enable UAC extension (0=disabled, 1=enabled, other credential providers available in UAC dialog, 2=enabled, Evo exclusive in UAC dialog )
+
 .PARAMETER MSIPath
     Optional path to a .msi or .zip file. If omitted, the latest version is downloaded.
 
@@ -131,6 +134,9 @@ param(
 
     [Parameter(ParameterSetName='CommandLineConfig')]
     [Nullable[int]] [ValidateSet(0, 1)] $RememberLastUserName,
+
+    [Parameter(ParameterSetName='CommandLineConfig')]
+    [Nullable[int]] [ValidateSet(0, 1, 2)] $UACExtension,
 
     [Parameter(ParameterSetName='CommandLineConfig', HelpMessage='Leave blank to download latest. Otherwise path to MSI or zip file to install')]
     [string] $MSIPath,
@@ -212,6 +218,7 @@ Parameters:
   -CustomPrompt           Optional path to a custom login prompt label
   -CustomImage            Optional path to a custom login prompt image
   -NoElevatedRDP          Optional flag to disable elevation for RDP sessions when Evo is the sole login agent (defaults on or value of previous install)
+  -UACExtension           Optional setting to enable UAC extension (0=disabled, 1=enabled, other credential providers available in UAC dialog, 2=enabled, Evo exclusive in UAC dialog ) (defaults disabled or value of previous install)
   -MSIPath                Optional .msi or .zip file path
   -Upgrade                Validate version is newer before installing
   -Remove                 Uninstall agent
@@ -581,6 +588,16 @@ function ParamMapFromJson {
     }
     elseif ($config.RememberLastUserName -eq 0) {
         $ParamMap["ENABLE_LAST_USERNAME"] = 0
+    }
+
+    if ($config.UACExtension -eq 0) {
+        $ParamMap["UAC_EXTENSION"] = 0
+    }
+    elseif ($config.UACExtension -eq 1) {
+        $ParamMap["UAC_EXTENSION"] = 1
+    }
+    elseif ($config.UACExtension -eq 2) {
+        $ParamMap["UAC_EXTENSION"] = 2
     }
 
     # trim string values in ParamMap
@@ -967,6 +984,9 @@ if (-not $Json) {
     }
     if ($null -ne $RememberLastUserName) {
         $MapForJson += @{ RememberLastUserName = $RememberLastUserName}
+    }
+    if ($null -ne $UACExtension) {
+        $MapForJson += @{ UACExtension = $UACExtension}
     }
     if ($MSIPath) {
         $MapForJson += @{ MSIPath = $MSIPath}
