@@ -112,7 +112,7 @@ param(
     [string] $CredentialMode,
 
     [Parameter(ParameterSetName='CommandLineConfig')]
-    [Nullable[bool]] $OnlyEvoLoginCredential,
+    [Nullable[int]] [ValidateSet(0, 1)] $OnlyEvoLoginCredential,
 
     [Parameter(ParameterSetName='CommandLineConfig')]
     [switch] $NoElevatedRDP,
