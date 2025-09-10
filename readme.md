@@ -38,6 +38,7 @@ This repository contains a PowerShell script to install, upgrade, or remove the 
 | `-CustomPrompt`           | Optional string to customize the login prompt                 |                                             |
 | `-CustomImage`            | Optional path to custom login image (URL or local file path   |                                             |
 | `-NoElevatedRDP`          | Optional flag to disable elevation for RDP sessions when Evo is the sole login agent | 1                    |
+| `-UACExtension`           | Optional setting to enable UAC extension (0=disabled, 1=enabled, other credential providers available in UAC dialog, 2=enabled, Evo exclusive in UAC dialog )                      | 0                                           |
 | `-MSIPath`                | Optional path to `.msi` or `.zip` file                        |                                             |
 | `-Upgrade`                | Ensure only newer versions replace installed ones             |                                             |
 | `-Remove`                 | Uninstalls the Evo Credential Provider                        |                                             |
