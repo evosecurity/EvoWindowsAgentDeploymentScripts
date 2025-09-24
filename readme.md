@@ -1,10 +1,10 @@
-# Evo Credential Provider Installer (v2.3+ Only)
+# Evo Deployment Scripts
 
-This repository contains a PowerShell script to install, upgrade, or remove the **Evo Credential Provider** on Windows systems. It supports both **interactive** and **silent** operation modes, enabling easy integration into manual admin workflows or automated deployment systems (e.g., RMM tools, Intune, GPO, etc.).
+This repository contains PowerShell scripts to install, upgrade, or remove the **Evo Credential Provider** or the **Evo LDAP Agent** on Windows systems. It supports both **interactive** and **silent** operation modes, enabling easy integration into manual admin workflows or automated deployment systems (e.g., RMM tools, Intune, GPO, etc.).
 
 ---
 
-## 📄 Script: `Install-EvoAgent.ps1`
+## 📄 Script: `InstallEvoAgent.ps1` (v2.3+ Only)
 
 ### ✔️ Features
 
@@ -59,31 +59,104 @@ When upgrading, any unspecified parameters are inherited from the previous insta
 ### Basic Install
 
 ```powershell
-.\Install-EvoAgent.ps1 -EnvironmentUrl "https://myorg.evosecurity.com" -EvoDirectory "MyOrg" -AccessToken "abc123" -Secret "xyz789"
+.\InstallEvoAgent.ps1 -EnvironmentUrl "https://myorg.evosecurity.com" -EvoDirectory "MyOrg" -AccessToken "abc123" -Secret "xyz789"
 ```
 
 ### With Upgrade Check and Logging
 
 ```powershell
-.\Install-EvoAgent.ps1 -Upgrade -Log
+.\InstallEvoAgent.ps1 -Upgrade -Log
 ```
 
 ### Removal
 
 ```powershell
-.\Install-EvoAgent.ps1 -Remove -Interactive -Log
+.\InstallEvoAgent.ps1 -Remove -Interactive -Log
 ```
 
 ### Legacy JSON Blob
 
 ```powershell
-.\Install-EvoAgent.ps1 -Json '{ "EnvironmentUrl": "...", "EvoDirectory": "...", "AccessToken": "...", "Secret": "..." }'
+.\InstallEvoAgent.ps1 -Json '{ "EnvironmentUrl": "...", "EvoDirectory": "...", "AccessToken": "...", "Secret": "..." }'
 ```
 
 ### Legacy JSON File
 
 ```powershell
-.\Install-EvoAgent.ps1 -Json 'c:\path\to\install.json'
+.\InstallEvoAgent.ps1 -Json 'c:\path\to\install.json'
+```
+
+---
+## 📄 Script: `InstallLdapAgent.ps1`
+
+### ✔️ Features
+
+- Installs the Evo LDAP Agent MSI or ZIP package (automatically extracts ZIP)
+- Automatically downloads the latest stable or beta version if no path is provided
+- Supports uninstall/removal logic
+- Silent mode support for unattended installations
+- Upgrade-safe: checks version before proceeding
+- Accepts legacy JSON blob configs or individual parameters
+- Includes integrated `-Help` functionality and CLI examples
+
+---
+
+## 🔧 Parameters
+
+| Parameter                 | Description                                                   | Default                                     |
+| ------------------------- | ------------------------------------------------------------- | ------------------------------------------- |
+| `-EnvironmentUrl`         | Evo portal base URL (e.g., `https://yourorg.evosecurity.com`) |                                             |
+| `-EvoDirectory`           | Your Evo organization/directory name                          |                                             |
+| `-AccessToken`            | Evo API access token                                          |                                             |
+| `-Secret`                 | Evo API secret                                                |                                             |
+| `-SyncSecurityGroup`      | AD security group(s) to sync. Separate muliple groups with `;`|                                             |
+| `-UpdateInterval`         | Optional interval in minutes to sync AD users                 | 10                                          |
+| `-DisableUpdate`          | Optional flag to disable auto updates                         | 0                                           |
+| `-MSIPath`                | Optional path to `.msi` or `.zip` file                        |                                             |
+| `-Upgrade`                | Ensure only newer versions replace installed ones             |                                             |
+| `-Remove`                 | Uninstalls the Evo Credential Provider                        |                                             |
+| `-Interactive`            | Runs installer with UI instead of silent mode                 |                                             |
+| `-Log`                    | Enables install/uninstall logging                             |                                             |
+| `-Beta`                   | Pulls installer from Evo's beta channel                       |                                             |
+| `-Json`                   | Legacy option to supply a JSON config blob or file            |                                             |
+| `-Help`                   | Displays built-in help text                                   |                                             |
+
+
+`-EnvironmentUrl`, `-EvoDirectory`, `-AccessToken`, and `-Secret` parameters are required except on upgrades or removal.\
+When upgrading, any unspecified parameters are inherited from the previous install.
+
+---
+
+## 🚀 Example Usages
+
+### Basic Install
+
+```powershell
+.\InstallLdapAgent.ps1 -EnvironmentUrl "https://myorg.evosecurity.com" -EvoDirectory "MyOrg" -AccessToken "abc123" -Secret "xyz789" -SyncSecurityGroup "EvoSync"
+```
+
+### With Upgrade Check and Logging
+
+```powershell
+.\InstallLdapAgent.ps1 -Upgrade -Log
+```
+
+### Removal
+
+```powershell
+.\InstallLdapAgent.ps1 -Remove -Interactive -Log
+```
+
+### Legacy JSON Blob
+
+```powershell
+.\InstallLdapAgent.ps1 -Json '{ "EnvironmentUrl": "...", "EvoDirectory": "...", "AccessToken": "...", "Secret": "...", "SyncSecurityGroup": "..." }'
+```
+
+### Legacy JSON File
+
+```powershell
+.\InstallLdapAgent.ps1 -Json 'c:\path\to\install.json'
 ```
 
 ---
