@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Evo Credential Provider Installer Script
+    Evo Windows Agent Installer Script
 
 .DESCRIPTION
-    This script installs, upgrades, or removes the Evo Credential Provider on a Windows machine.
+    This script installs, upgrades, or removes the Evo Windows Agent on a Windows machine.
     It can be used interactively or in silent mode with command-line parameters.
 
 .PARAMETER EnvironmentUrl
@@ -66,7 +66,7 @@
     If specified, will only install a newer version over a previously installed version
 
 .PARAMETER Remove
-    Uninstalls the Evo Credential Provider
+    Uninstalls the Evo Windows Agent
 
 .PARAMETER Interactive
     Runs the installer in UI mode (non-silent)
@@ -81,7 +81,7 @@
     Displays usage information
 
 .EXAMPLE
-    .\Install-EvoAgent.ps1 -EnvironmentUrl "https://..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -CredentialMode "SecureLogin" -Upgrade -Log
+    .\InstallEvoAgent.ps1 -EnvironmentUrl "https://..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -CredentialMode "SecureLogin" -Upgrade -Log
 
 .NOTES
     Requires administrator privileges unless run in interactive mode
@@ -115,7 +115,7 @@ param(
     [string] $CredentialMode,
 
     [Parameter(ParameterSetName='CommandLineConfig')]
-    [Nullable[bool]] $OnlyEvoLoginCredential,
+    [ValidateSet(0, 1, $false, $true)] $OnlyEvoLoginCredential,
 
     [Parameter(ParameterSetName='CommandLineConfig')]
     [switch] $NoElevatedRDP,
@@ -178,27 +178,27 @@ param(
 
 function Show-Help {
     @"
-Evo Credential Provider Installer
+Evo Windows Agent Installer
 ----------------------------------
 
-This script installs, upgrades, or removes the Evo Credential Provider.
+This script installs, upgrades, or removes the Evo Windows Agent.
 
 Usage Examples:
 ---------------
   Install:
-    .\Install-EvoAgent.ps1 -EnvironmentUrl "https://myorg.evosecurity.com" -EvoDirectory "MyOrg" -AccessToken "abc123" -Secret "xyz789"
+    .\InstallEvoAgent.ps1 -EnvironmentUrl "https://myorg.evosecurity.com" -EvoDirectory "MyOrg" -AccessToken "abc123" -Secret "xyz789"
 
   Install with logging and upgrade (uses existing settings):
-    .\Install-EvoAgent.ps1 -Upgrade -Log
+    .\InstallEvoAgent.ps1 -Upgrade -Log
 
   Remove:
-    .\Install-EvoAgent.ps1 -Remove -Interactive -Log
+    .\InstallEvoAgent.ps1 -Remove -Interactive -Log
 
   Install from file:
-    .\Install-EvoAgent.ps1 -EnvironmentUrl "..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -MSIPath ".\agent.zip"
+    .\InstallEvoAgent.ps1 -EnvironmentUrl "..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -MSIPath ".\agent.zip"
 
   Help:
-    .\Install-EvoAgent.ps1 -Help
+    .\InstallEvoAgent.ps1 -Help
 
 Parameters:
 -----------
@@ -939,7 +939,7 @@ if ($Upgrade) {
 }
 
 if (-not $Json) {
-    Write-Verbose "Installing Evo Credential Provider..."
+    Write-Verbose "Installing Evo Windows Agent..."
     # Write-Verbose "Parameters: EnvironmentUrl=$EnvironmentUrl; EvoDirectory=$EvoDirectory; Secret=$Secret; AccessToken=$AccessToken"
     $MapForJson = @{}
 
@@ -968,7 +968,15 @@ if (-not $Json) {
         $MapForJson += @{ MFATimeOut = $MFATimeOut}
     }
     if ($null -ne $OnlyEvoLoginCredential) {
-        $MapForJson += @{ OnlyEvoLoginCredential = $OnlyEvoLoginCredential}
+        $boolValue = $null
+        if ($OnlyEvoLoginCredential -is [bool]) {
+			$boolValue = $OnlyEvoLoginCredential
+        } elseif ($OnlyEvoLoginCredential -in (1, "1", "True")) {
+            $boolValue = $true
+        } elseif ($OnlyEvoLoginCredential -in (0, "0", "False")) {
+			$boolValue = $false
+        }
+        $MapForJson += @{ OnlyEvoLoginCredential = $boolValue }
     }
     if ($null -ne $DisableUpdate) {
         $MapForJson += @{ DisableUpdate = $DisableUpdate}
