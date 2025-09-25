@@ -129,7 +129,7 @@ When upgrading, any unspecified parameters are inherited from the previous insta
 | `-EvoDirectory`      | Your Evo organization/directory name                           |         |
 | `-AccessToken`       | Evo API access token                                           |         |
 | `-Secret`            | Evo API secret                                                 |         |
-| `-SyncSecurityGroup` | AD security group(s) to sync. Separate muliple groups with `;` |         |
+| `-SyncSecurityGroup` | AD security group(s) to sync. Separate multiple groups with `;` |         |
 | `-UpdateInterval`    | Optional interval in minutes to sync AD users                  | 10      |
 | `-DisableUpdate`     | Optional flag to disable auto updates                          | 0       |
 | `-MSIPath`           | Optional path to `.msi` or `.zip` file                         |         |
