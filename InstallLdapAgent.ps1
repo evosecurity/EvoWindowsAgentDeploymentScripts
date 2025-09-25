@@ -83,10 +83,10 @@ param(
 
 function Show-Help {
     @"
-Evo Credential Provider Installer
+Evo LDAP Agent Installer
 ----------------------------------
 
-This script installs, upgrades, or removes the Evo Credential Provider.
+This script installs, upgrades, or removes the Evo LDAP Agent.
 
 Usage Examples:
 ---------------
@@ -388,7 +388,7 @@ function ParamMapFromJson {
     
     $ParamMap = @{}
     if (-not $JsonConfig) {
-        return $BuiltUpInstallerMap
+        return $ParamMap
     }
 
 	$rawContent = GetJsonRawContent $JsonConfig
@@ -656,7 +656,7 @@ if ($Upgrade) {
 }
 
 if (-not $Json) {
-    Write-Verbose "Installing Evo Credential Provider..."
+    Write-Verbose "Installing Evo LDAP Agent..."
     # Write-Verbose "Parameters: EnvironmentUrl=$EnvironmentUrl; EvoDirectory=$EvoDirectory; Secret=$Secret; AccessToken=$AccessToken"
     $MapForJson = @{}
 
@@ -722,7 +722,7 @@ if (-not $ParamMap.MSIPath) { ### we have to download the file ...
     if (-not (Test-Path $ParamMap.MSIPath)) {
         throw "MSI path does not exist: $($ParamMap.MSIPath)"
     } else {
-        if ($ParamMap.MsiPath.ToLower().EndsWith(".msi")) {
+        if ($ParamMap.MSIPath.ToLower().EndsWith(".msi")) {
             $MSIPath = $ParamMap.MSIPath
         }
         elseif ($ParamMap.MSIPath.ToLower().EndsWith(".zip")) {
