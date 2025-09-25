@@ -115,7 +115,7 @@ param(
     [string] $CredentialMode,
 
     [Parameter(ParameterSetName='CommandLineConfig')]
-    [Nullable[bool]] $OnlyEvoLoginCredential,
+    [ValidateSet(0, 1, $false, $true)] $OnlyEvoLoginCredential,
 
     [Parameter(ParameterSetName='CommandLineConfig')]
     [switch] $NoElevatedRDP,
@@ -968,7 +968,15 @@ if (-not $Json) {
         $MapForJson += @{ MFATimeOut = $MFATimeOut}
     }
     if ($null -ne $OnlyEvoLoginCredential) {
-        $MapForJson += @{ OnlyEvoLoginCredential = $OnlyEvoLoginCredential}
+        $boolValue = $null
+        if ($OnlyEvoLoginCredential -is [bool]) {
+			$boolValue = $OnlyEvoLoginCredential
+        } elseif ($OnlyEvoLoginCredential -in (1, "1", "True")) {
+            $boolValue = $true
+        } elseif ($OnlyEvoLoginCredential -in (0, "0", "False")) {
+			$boolValue = $false
+        }
+        $MapForJson += @{ OnlyEvoLoginCredential = $boolValue }
     }
     if ($null -ne $DisableUpdate) {
         $MapForJson += @{ DisableUpdate = $DisableUpdate}
