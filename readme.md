@@ -1,6 +1,26 @@
 # Evo Deployment Scripts
 
-This repository contains PowerShell scripts to install, upgrade, or remove the **Evo Credential Provider** or the **Evo LDAP Agent** on Windows systems. It supports both **interactive** and **silent** operation modes, enabling easy integration into manual admin workflows or automated deployment systems (e.g., RMM tools, Intune, GPO, etc.).
+This repository contains PowerShell scripts to install, upgrade, or remove the **Evo Windows Agent** or the **Evo LDAP Agent** on Windows systems. It supports both **interactive** and **silent** operation modes, enabling easy integration into manual admin workflows or automated deployment systems (e.g., RMM tools, Intune, GPO, etc.).
+
+---
+
+## 📑 Table of Contents
+
+- [📄 Script: InstallEvoAgent.ps1 (v2.3+ Only)](#-script-installevoagentps1-v23-only)
+
+  - [✔️ Features](#️-features)
+  - [🔧 Parameters](#-parameters)
+  - [🚀 Example Usages](#-example-usages)
+
+- [📄 Script: InstallLdapAgent.ps1](#-script-installldapagentps1)
+
+  - [✔️ Features](#️-features-1)
+  - [🔧 Parameters](#-parameters-1)
+  - [🚀 Example Usages](#-example-usages-1)
+
+- [⚠️ Notes](#️-notes)
+- [📬 Support](#-support)
+- [📝 License](#-license)
 
 ---
 
@@ -8,7 +28,7 @@ This repository contains PowerShell scripts to install, upgrade, or remove the *
 
 ### ✔️ Features
 
-- Installs the Evo Credential Provider MSI or ZIP package (automatically extracts ZIP)
+- Installs the Evo Windows Agent MSI or ZIP package (automatically extracts ZIP)
 - Automatically downloads the latest stable or beta version if no path is provided
 - Supports uninstall/removal logic
 - Silent mode support for unattended installations
@@ -20,36 +40,35 @@ This repository contains PowerShell scripts to install, upgrade, or remove the *
 
 ## 🔧 Parameters
 
-| Parameter                 | Description                                                   | Default                                     |
-| ------------------------- | ------------------------------------------------------------- | ------------------------------------------- |
-| `-EnvironmentUrl`         | Evo portal base URL (e.g., `https://yourorg.evosecurity.com`) |                                             |
-| `-EvoDirectory`           | Your Evo organization/directory name                          |                                             |
-| `-AccessToken`            | Evo API access token                                          |                                             |
-| `-Secret`                 | Evo API secret                                                |                                             |
-| `-FailSafeUser`           | Optional username to use as a fallback if Evo login fails     |                                             |
-| `-MFATimeOut`             | Optional grace period to not require MFA for an unlock (in minutes from previous MFA prompt) | 0            |
-| `-CredentialMode`         | `SecureLogin`, `ElevatedLogin`, or `SecureAndElevatedLogin`   | SecureAndElevatedLogin                      |
-| `-OnlyEvoLoginCredential` | If set, Evo becomes the only credential provider              | 0                                           |
-| `-RememberLastUserName`   | Optional flag to remember the last username used              | 1                                           |
-| `-DisableUpdate`          | Optional flag to disable auto updates                         | 0                                           |
-| `-JitMode`                | Optional flag to enable Just-In-Time admin accounts           | 0                                           |
-| `-EndUserElevation`       | Optional flag to enable end-user elevation                    | 0                                           |
-| `-UserAdminEscalation`    | Optional flag to prompt admins with the end-user elevation prompt instead of the standard UAC prompt | 0    |
-| `-CustomPrompt`           | Optional string to customize the login prompt                 |                                             |
-| `-CustomImage`            | Optional path to custom login image (URL or local file path   |                                             |
-| `-NoElevatedRDP`          | Optional flag to disable elevation for RDP sessions when Evo is the sole login agent | 1                    |
-| `-UACExtension`           | Optional setting to enable UAC extension (0=disabled, 1=enabled, other credential providers available in UAC dialog, 2=enabled, Evo exclusive in UAC dialog )                      | 0                                           |
-| `-MSIPath`                | Optional path to `.msi` or `.zip` file                        |                                             |
-| `-Upgrade`                | Ensure only newer versions replace installed ones             |                                             |
-| `-Remove`                 | Uninstalls the Evo Credential Provider                        |                                             |
-| `-Interactive`            | Runs installer with UI instead of silent mode                 |                                             |
-| `-Log`                    | Enables install/uninstall logging                             |                                             |
-| `-Beta`                   | Pulls installer from Evo's beta channel                       |                                             |
-| `-Json`                   | Legacy option to supply a JSON config blob or file            |                                             |
-| `-Help`                   | Displays built-in help text                                   |                                             |
+| Parameter                 | Description                                                                                                                                                   | Default                |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `-EnvironmentUrl`         | Evo portal base URL (e.g., `https://yourorg.evosecurity.com`)                                                                                                 |                        |
+| `-EvoDirectory`           | Your Evo organization/directory name                                                                                                                          |                        |
+| `-AccessToken`            | Evo API access token                                                                                                                                          |                        |
+| `-Secret`                 | Evo API secret                                                                                                                                                |                        |
+| `-FailSafeUser`           | Optional username to use as a fallback if Evo login fails                                                                                                     |                        |
+| `-MFATimeOut`             | Optional grace period to not require MFA for an unlock (in minutes from previous MFA prompt)                                                                  | 0                      |
+| `-CredentialMode`         | `SecureLogin`, `ElevatedLogin`, or `SecureAndElevatedLogin`                                                                                                   | SecureAndElevatedLogin |
+| `-OnlyEvoLoginCredential` | If set, Evo becomes the only credential provider                                                                                                              | 0                      |
+| `-RememberLastUserName`   | Optional flag to remember the last username used                                                                                                              | 1                      |
+| `-DisableUpdate`          | Optional flag to disable auto updates                                                                                                                         | 0                      |
+| `-JitMode`                | Optional flag to enable Just-In-Time admin accounts                                                                                                           | 0                      |
+| `-EndUserElevation`       | Optional flag to enable end-user elevation                                                                                                                    | 0                      |
+| `-UserAdminEscalation`    | Optional flag to prompt admins with the end-user elevation prompt instead of the standard UAC prompt                                                          | 0                      |
+| `-CustomPrompt`           | Optional string to customize the login prompt                                                                                                                 |                        |
+| `-CustomImage`            | Optional path to custom login image (URL or local file path                                                                                                   |                        |
+| `-NoElevatedRDP`          | Optional flag to disable elevation for RDP sessions when Evo is the sole login agent                                                                          | 1                      |
+| `-UACExtension`           | Optional setting to enable UAC extension (0=disabled, 1=enabled, other credential providers available in UAC dialog, 2=enabled, Evo exclusive in UAC dialog ) | 0                      |
+| `-MSIPath`                | Optional path to `.msi` or `.zip` file                                                                                                                        |                        |
+| `-Upgrade`                | Ensure only newer versions replace installed ones                                                                                                             |                        |
+| `-Remove`                 | Uninstalls the Evo Credential Provider                                                                                                                        |                        |
+| `-Interactive`            | Runs installer with UI instead of silent mode                                                                                                                 |                        |
+| `-Log`                    | Enables install/uninstall logging                                                                                                                             |                        |
+| `-Beta`                   | Pulls installer from Evo's beta channel                                                                                                                       |                        |
+| `-Json`                   | Legacy option to supply a JSON config blob or file                                                                                                            |                        |
+| `-Help`                   | Displays built-in help text                                                                                                                                   |                        |
 
-
-`-EnvironmentUrl`, `-EvoDirectory`, `-AccessToken`, and `-Secret` parameters are required except on upgrades or removal.\
+`-EnvironmentUrl`, `-EvoDirectory`, `-AccessToken`, and `-Secret` parameters are required except on upgrades or removal.  
 When upgrading, any unspecified parameters are inherited from the previous install.
 
 ---
@@ -87,6 +106,7 @@ When upgrading, any unspecified parameters are inherited from the previous insta
 ```
 
 ---
+
 ## 📄 Script: `InstallLdapAgent.ps1`
 
 ### ✔️ Features
@@ -103,26 +123,25 @@ When upgrading, any unspecified parameters are inherited from the previous insta
 
 ## 🔧 Parameters
 
-| Parameter                 | Description                                                   | Default                                     |
-| ------------------------- | ------------------------------------------------------------- | ------------------------------------------- |
-| `-EnvironmentUrl`         | Evo portal base URL (e.g., `https://yourorg.evosecurity.com`) |                                             |
-| `-EvoDirectory`           | Your Evo organization/directory name                          |                                             |
-| `-AccessToken`            | Evo API access token                                          |                                             |
-| `-Secret`                 | Evo API secret                                                |                                             |
-| `-SyncSecurityGroup`      | AD security group(s) to sync. Separate muliple groups with `;`|                                             |
-| `-UpdateInterval`         | Optional interval in minutes to sync AD users                 | 10                                          |
-| `-DisableUpdate`          | Optional flag to disable auto updates                         | 0                                           |
-| `-MSIPath`                | Optional path to `.msi` or `.zip` file                        |                                             |
-| `-Upgrade`                | Ensure only newer versions replace installed ones             |                                             |
-| `-Remove`                 | Uninstalls the Evo Credential Provider                        |                                             |
-| `-Interactive`            | Runs installer with UI instead of silent mode                 |                                             |
-| `-Log`                    | Enables install/uninstall logging                             |                                             |
-| `-Beta`                   | Pulls installer from Evo's beta channel                       |                                             |
-| `-Json`                   | Legacy option to supply a JSON config blob or file            |                                             |
-| `-Help`                   | Displays built-in help text                                   |                                             |
+| Parameter            | Description                                                    | Default |
+| -------------------- | -------------------------------------------------------------- | ------- |
+| `-EnvironmentUrl`    | Evo portal base URL (e.g., `https://yourorg.evosecurity.com`)  |         |
+| `-EvoDirectory`      | Your Evo organization/directory name                           |         |
+| `-AccessToken`       | Evo API access token                                           |         |
+| `-Secret`            | Evo API secret                                                 |         |
+| `-SyncSecurityGroup` | AD security group(s) to sync. Separate muliple groups with `;` |         |
+| `-UpdateInterval`    | Optional interval in minutes to sync AD users                  | 10      |
+| `-DisableUpdate`     | Optional flag to disable auto updates                          | 0       |
+| `-MSIPath`           | Optional path to `.msi` or `.zip` file                         |         |
+| `-Upgrade`           | Ensure only newer versions replace installed ones              |         |
+| `-Remove`            | Uninstalls the Evo Credential Provider                         |         |
+| `-Interactive`       | Runs installer with UI instead of silent mode                  |         |
+| `-Log`               | Enables install/uninstall logging                              |         |
+| `-Beta`              | Pulls installer from Evo's beta channel                        |         |
+| `-Json`              | Legacy option to supply a JSON config blob or file             |         |
+| `-Help`              | Displays built-in help text                                    |         |
 
-
-`-EnvironmentUrl`, `-EvoDirectory`, `-AccessToken`, and `-Secret` parameters are required except on upgrades or removal.\
+`-EnvironmentUrl`, `-EvoDirectory`, `-AccessToken`, and `-Secret` parameters are required except on upgrades or removal.  
 When upgrading, any unspecified parameters are inherited from the previous install.
 
 ---
@@ -171,11 +190,10 @@ When upgrading, any unspecified parameters are inherited from the previous insta
 
 ## 📬 Support
 
-Please contact [support@evosecurity.com](mailto\:support@evosecurity.com) for assistance.
+Please contact [support@evosecurity.com](mailto:support@evosecurity.com) for assistance.
 
 ---
 
 ## 📝 License
 
 Copyright © Evo Security Technologies. All rights reserved.
-
