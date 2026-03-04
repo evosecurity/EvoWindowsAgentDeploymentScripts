@@ -65,6 +65,7 @@ Minimum supported Agent version for any option is 2.3 unless indicated otherwise
 | `-DisableEvoUac`          | Optional setting to disable the Evo credential in the UAC dialog (Minimum supported agent = 2.4)                                                              | 0                      |
 | `-UnlimitedExtendedUacSession`  | Optional setting to enable unlimited extended UAC session  (Minimum supported agent = 2.4)                                                              | 0                      |
 | `-PersistentRequest`      | Optional setting to enable persistent elevation request notifications instead of having a 10 second timeout (Minimum supported agent = 2.4)                   | 0                      |
+| `-RMM`                    | Optional setting to enable RMM (Remote Monitoring and Management) functionality. Only Ninja deployment token retrieval for now (Minimum supported agent = 2.5)|                        |
 | `-MSIPath`                | Optional path to `.msi` or `.zip` file                                                                                                                        |                        |
 | `-Upgrade`                | Ensure only newer versions replace installed ones                                                                                                             |                        |
 | `-Remove`                 | Uninstalls the Evo Credential Provider                                                                                                                        |                        |
@@ -87,6 +88,14 @@ When upgrading, any unspecified parameters are inherited from the previous insta
 ```powershell
 .\InstallEvoAgent.ps1 -DeploymentToken "deptoken123abc"
 ```
+
+### Install with Ninja deployment token retrieval (agent 2.5+)
+
+In this case, `evoDeploymentToken` is the property you've defined to hold the deployment token in your Ninja configuration
+```powershell
+.\InstallEvoAgent.ps1 -DeploymentToken evoDeploymentToken -RMM Ninja
+```
+
 
 ### Basic Install (still supported)
 

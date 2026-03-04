@@ -74,6 +74,9 @@
 .PARAMETER PersistentRequest
     Optional setting to enable persistent elevation request notifications instead of having a 10 second timeout
 
+.PARAMETER RMM
+    Optional setting to enable RMM (Remote Monitoring and Management) functionality. Only Ninja deployment token retrieval for now. 
+
 .PARAMETER MSIPath
     Optional path to a .msi or .zip file. If omitted, the latest version is downloaded.
 
@@ -184,6 +187,9 @@ param(
     [Nullable[int]] [ValidateSet(0, 1)] $PersistentRequest,
 
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
+    [string] $RMM,
+
+    [Parameter(ParameterSetName='DeploymentTokenConfig')]
     [Parameter(ParameterSetName='CommandLineConfig', HelpMessage='Leave blank to download latest. Otherwise path to MSI or zip file to install')]
     [string] $MSIPath,
 
@@ -280,6 +286,7 @@ Parameters:
   -DisableEvoUac          Optional setting to disable the Evo credential in the UAC dialog (defaults off or value of previous install, minimum supported agent = 2.4)
   -UnlimitedExtendedUacSession Optional setting to enable unlimited extended UAC session (defaults off or value of previous install, minimum supported agent = 2.4)
   -PersistentRequest      Optional setting to enable persistent elevation request notifications instead of having a 10 second timeout (defaults off or value of previous install, minimum supported agent = 2.4)
+  -RMM                    Optional setting to enable RMM (Remote Monitoring and Management) functionality -- only Ninja deployment token retrieval for now
   -MSIPath                Optional .msi or .zip file path
   -Upgrade                Validate version is newer before installing
   -Remove                 Uninstall agent
@@ -320,6 +327,47 @@ function GetInstalledDisplayName()
 function GetInstalledDisplayNames()
 {
     return "Evo Agent","Evo Secure Login"
+}
+
+# For now only Ninja is supported, and only for the DeploymentToken property
+function Get-DynamicToken {
+    param (
+        [string]$Token,
+		[string]$RMM
+    )
+	
+	if ([string]::IsNullOrWhiteSpace($RMM)) {
+		return $Token
+	}
+	
+	if ([string]::IsNullOrWhiteSpace($Token)) {
+		Write-Error "An RMM was specified ($RMM) but the required token property was not provided"
+		exit 1
+	}
+	
+	switch ($RMM.ToLower()) {
+		"ninja" {
+			Write-Host "Action: Fetching '$Token' from Ninja RMM..." -ForegroundColor Cyan
+			try {
+                # Ensure the command exists to avoid a "CommandNotFound" red block
+                if (-not (Get-Command "Ninja-Property-Get" -ErrorAction SilentlyContinue)) {
+                    throw "Ninja-Property-Get command not found. Is the Ninja Agent installed?"
+                }
+				
+				$Result = (Ninja-Property-Get $Token | Out-String).Trim()
+				if (-not $Result) { throw "Property is empty." }
+				return $Result
+			}
+			catch {
+				Write-Error "Failed to retrieve from Ninja: $_"
+				exit 1
+			}
+		}
+		default {
+			Write-Error "RMM $RMM is not currently supported by this script."
+			exit 1
+		}
+	}
 }
 
 function GetInstalledSoftware($DisplayNames)
@@ -1037,6 +1085,8 @@ if (-not $Json) {
     # Write-Verbose "Parameters: EnvironmentUrl=$EnvironmentUrl; EvoDirectory=$EvoDirectory; Secret=$Secret; AccessToken=$AccessToken"
     $MapForJson = @{}
 
+    $DeploymentToken = Get-DynamicToken -Token $DeploymentToken -RMM $RMM
+    
     if ($DeploymentToken) {
         $MapForJson += @{ DeploymentToken = $DeploymentToken}
     }
