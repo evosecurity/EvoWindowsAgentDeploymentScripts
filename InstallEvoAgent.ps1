@@ -980,6 +980,20 @@ function GetServiceLocation {
     return ($Item.ImagePath).Trim('"') # can be wrapped in quotes which we want to remove
 }
 
+function GetAgentLocation {
+    $ServiceNames = @('EvoAgent', 'EvoSecureLoginAgent')
+
+    foreach ($ServiceName in $ServiceNames) {
+        $ServiceLocation = GetServiceLocation $ServiceName
+        if ($ServiceLocation) {
+            Write-Verbose "Found agent service location using service name: $ServiceName"
+            return $ServiceLocation
+        }
+    }
+
+    return $null
+}
+
 function SetCustomPrompt {
     param (
         [string]$CustomPrompt
@@ -1260,7 +1274,7 @@ try {
     SetCustomPrompt $JsonMap.CustomPrompt
 
     if ($JsonMap.CustomImage) {
-        $AgentLocation = GetServiceLocation 'EvoSecureLoginAgent'
+		$AgentLocation = GetAgentLocation
         Write-Verbose "AgentLocation: $AgentLocation"
         if ($AgentLocation -and (Test-Path $AgentLocation)) {
             $AgentDirectory = (Get-Item $AgentLocation).DirectoryName
