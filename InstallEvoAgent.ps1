@@ -973,7 +973,25 @@ function GetServiceLocation {
 	)
 	
 	$Item = Get-ItemProperty "hklm:\System\CurrentControlSet\Services\$ServiceName" 'ImagePath' -ErrorAction Ignore
-	return ($Item.ImagePath).Trim('"') # can be wrapped in quotes which we want to remove
+    if (-not $Item -or -not $Item.ImagePath) {
+        return $null
+    }
+
+    return ($Item.ImagePath).Trim('"') # can be wrapped in quotes which we want to remove
+}
+
+function GetAgentLocation {
+    $ServiceNames = @('EvoAgent', 'EvoSecureLoginAgent')
+
+    foreach ($ServiceName in $ServiceNames) {
+        $ServiceLocation = GetServiceLocation $ServiceName
+        if ($ServiceLocation) {
+            Write-Verbose "Found agent service location using service name: $ServiceName"
+            return $ServiceLocation
+        }
+    }
+
+    return $null
 }
 
 function SetCustomPrompt {
@@ -1251,18 +1269,20 @@ try {
         LogFileName = if ($Log) { GetLogFileName $ProductType $true } else { "" }
     }
     InstallMSI @InstallMSIArgs
-	
-	$AgentLocation = GetServiceLocation 'EvoSecureLoginAgent'
-	Write-Verbose "AgentLocation: $AgentLocation"
-	if (Test-Path $AgentLocation) {
-		$AgentDirectory = (Get-Item $AgentLocation).DirectoryName
-		$JsonMap = ConvertFrom-Json (GetJsonRawContent $json)
-		
-		SetCustomPrompt $JsonMap.CustomPrompt
-		SetCustomImage $JsonMap.CustomImage $AgentDirectory
-	} else {
-		Write-Error "Could not find agent location"
-	}
+
+    $JsonMap = ConvertFrom-Json (GetJsonRawContent $json)
+    SetCustomPrompt $JsonMap.CustomPrompt
+
+    if ($JsonMap.CustomImage) {
+		$AgentLocation = GetAgentLocation
+        Write-Verbose "AgentLocation: $AgentLocation"
+        if ($AgentLocation -and (Test-Path $AgentLocation)) {
+            $AgentDirectory = (Get-Item $AgentLocation).DirectoryName
+            SetCustomImage $JsonMap.CustomImage $AgentDirectory
+        } else {
+            Write-Error "Could not find agent location; unable to apply CustomImage"
+        }
+    }
 	
 }
 finally {
