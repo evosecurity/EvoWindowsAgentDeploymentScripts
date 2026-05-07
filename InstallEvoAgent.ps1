@@ -74,6 +74,9 @@
 .PARAMETER PersistentRequest
     Optional setting to enable persistent elevation request notifications instead of having a 10 second timeout
 
+.PARAMETER TamperUninstallPassword
+    Optional password required before uninstalling the Evo Windows Agent
+
 .PARAMETER RMM
     Optional setting to enable RMM (Remote Monitoring and Management) functionality. Only Ninja deployment token retrieval for now. 
 
@@ -149,6 +152,10 @@ param(
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
     [Parameter(ParameterSetName='CommandLineConfig')]
     [Nullable[bool]] $DisableUpdate,
+
+    [Parameter(ParameterSetName='DeploymentTokenConfig')]
+    [Parameter(ParameterSetName='CommandLineConfig')]
+    [string] $TamperUninstallPassword,
 
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
     [Parameter(ParameterSetName='CommandLineConfig')]
@@ -286,6 +293,7 @@ Parameters:
   -DisableEvoUac          Optional setting to disable the Evo credential in the UAC dialog (defaults off or value of previous install, minimum supported agent = 2.4)
   -UnlimitedExtendedUacSession Optional setting to enable unlimited extended UAC session (defaults off or value of previous install, minimum supported agent = 2.4)
   -PersistentRequest      Optional setting to enable persistent elevation request notifications instead of having a 10 second timeout (defaults off or value of previous install, minimum supported agent = 2.4)
+  -TamperUninstallPassword Optional password required before uninstalling the Evo Windows Agent
   -RMM                    Optional setting to enable RMM (Remote Monitoring and Management) functionality -- only Ninja deployment token retrieval for now
   -MSIPath                Optional .msi or .zip file path
   -Upgrade                Validate version is newer before installing
@@ -674,6 +682,10 @@ function ParamMapFromJson {
     }
     elseif ($false -eq $config.DisableUpdate) {
         $ParamMap["DISABLE_UPDATE"] = 0
+    }
+
+    if ($config.TamperUninstallPassword) {
+        $ParamMap["TAMPER_UNINSTALL_PASSWORD"] = $config.TamperUninstallPassword
     }
 
     if ($config.JitMode -eq 1) {
@@ -1145,6 +1157,9 @@ if (-not $Json) {
     }
     if ($null -ne $DisableUpdate) {
         $MapForJson += @{ DisableUpdate = $DisableUpdate}
+    }
+    if ($TamperUninstallPassword) {
+        $MapForJson += @{ TamperUninstallPassword = $TamperUninstallPassword}
     }
     if ($null -ne $JitMode) {
         $MapForJson += @{ JitMode = $JitMode}
