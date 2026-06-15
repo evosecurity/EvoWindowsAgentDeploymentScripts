@@ -79,6 +79,11 @@
 
 .PARAMETER MSIPath
     Optional path to a .msi or .zip file. If omitted, the latest version is downloaded.
+    Cannot be used together with InstallerPath. Deprecated in favor of InstallerPath.
+
+.PARAMETER InstallerPath
+    Optional path to a .msi, .exe, or .zip file (zip must contain a single .msi or .exe).
+    Cannot be used together with MSIPath.
 
 .PARAMETER Upgrade
     If specified, will only install a newer version over a previously installed version
@@ -194,6 +199,10 @@ param(
     [string] $MSIPath,
 
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
+    [Parameter(ParameterSetName='CommandLineConfig', HelpMessage='Path to MSI, EXE, or zip file to install. Cannot be used with MSIPath')]
+    [string] $InstallerPath,
+
+    [Parameter(ParameterSetName='DeploymentTokenConfig')]
     [Parameter(ParameterSetName='JsonConfig')]
     [Parameter(ParameterSetName='CommandLineConfig', DontShow=$true)]
     [hashtable] $Dictionary,
@@ -256,8 +265,11 @@ Usage Examples:
   Remove:
     .\InstallEvoAgent.ps1 -Remove -Interactive -Log
 
-  Install from file:
+  Install from MSI or zip file (legacy):
     .\InstallEvoAgent.ps1 -EnvironmentUrl "..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -MSIPath ".\agent.zip"
+
+  Install from MSI, EXE, or zip file:
+    .\InstallEvoAgent.ps1 -EnvironmentUrl "..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -InstallerPath ".\agent.exe"
 
   Help:
     .\InstallEvoAgent.ps1 -Help
@@ -287,7 +299,8 @@ Parameters:
   -UnlimitedExtendedUacSession Optional setting to enable unlimited extended UAC session (defaults off or value of previous install, minimum supported agent = 2.4)
   -PersistentRequest      Optional setting to enable persistent elevation request notifications instead of having a 10 second timeout (defaults off or value of previous install, minimum supported agent = 2.4)
   -RMM                    Optional setting to enable RMM (Remote Monitoring and Management) functionality -- only Ninja deployment token retrieval for now
-  -MSIPath                Optional .msi or .zip file path
+  -MSIPath                Optional .msi or .zip file path (legacy; mutually exclusive with InstallerPath)
+  -InstallerPath          Optional .msi, .exe, or .zip file path (mutually exclusive with MSIPath)
   -Upgrade                Validate version is newer before installing
   -Remove                 Uninstall agent
   -Interactive            Show UI for install/uninstall
@@ -317,6 +330,37 @@ if ($Help) {
 function IsRunningAsAdministrator {
     $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     return $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Start-InstallerProcess {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][string] $FilePath,
+        [array] $ArgumentList
+    )
+
+    $startParams = @{
+        FilePath = $FilePath
+        Wait = $true
+        PassThru = $true
+    }
+    if ($ArgumentList -and $ArgumentList.Count -gt 0) {
+        $startParams['ArgumentList'] = $ArgumentList
+    }
+    if (-not (IsRunningAsAdministrator)) {
+        $startParams['Verb'] = 'RunAs'
+    }
+
+    Write-Verbose "Starting installer: FilePath=$FilePath Verb=$($startParams.Verb) ArgumentList=$ArgumentList"
+    try {
+        return Start-Process @startParams
+    }
+    catch {
+        if ($_.Exception.Message -match 'canceled|cancelled|1223') {
+            throw "Installation was cancelled or elevation was denied."
+        }
+        throw
+    }
 }
 
 function GetInstalledDisplayName()
@@ -405,7 +449,9 @@ function GetBaseUrlAndInfoUrl {
 
     $mid = if ($Beta) { 'beta' } else { 'release' }
 
-    $BaseUrl = "https://download.evosecurity.com/$mid/credpro/"
+    $BaseUpdateUrl = if ($env:EvoBaseUpdateUrl) {$env:EvoBaseUpdateUrl} else { 'https://download.evosecurity.com' }
+
+    $BaseUrl = "$BaseUpdateUrl/$mid/credpro/"
     $LatestInfoUrl = $BaseUrl + "credential-provider-latest-info.json" 
 
     return $BaseUrl, $LatestInfoUrl
@@ -417,6 +463,7 @@ function GetLatestInfo {
         [string] $LatestInfoUrl
     )
 
+    Write-Verbose "LatestInfoUrl: $LatestInfoUrl"
     $rawInfo = Invoke-RestMethod -uri $LatestInfoUrl -UseBasicParsing -Headers @{"Cache-Control"="no-cache"}
     Write-Verbose "Processor Architecture: $env:PROCESSOR_ARCHITECTURE"
     Write-Verbose "RawInfo: $rawInfo"
@@ -445,7 +492,7 @@ function GetLatestInfo {
     return $latestInfo
 }
 
-function GetTempMsiFrom-ByteArray {
+function GetTempInstallerFrom-ByteArray {
     [CmdletBinding()]
     param(
         [byte[]] $bytes
@@ -458,40 +505,43 @@ function GetTempMsiFrom-ByteArray {
         
         try {
             $zipArchive = [System.IO.Compression.ZipArchive]::new($memStream, [System.IO.Compression.ZipArchiveMode]::Read)
-            if ($zipArchive.Entries.Count -eq 1 -and $zipArchive.Entries[0].Name.ToLower().EndsWith(".msi")) {
+            if ($zipArchive.Entries.Count -eq 1) {
+                $entryName = $zipArchive.Entries[0].Name.ToLower()
+                if ($entryName.EndsWith(".msi") -or $entryName.EndsWith(".exe")) {
                 try {
-                    $msiInStream = $zipArchive.Entries[0].Open()
+                    $installerInStream = $zipArchive.Entries[0].Open()
                     try {
-                        $msiOutPath = Join-Path $env:Temp $zipArchive.Entries[0].Name
-                        $msiOutStream = [System.IO.File]::OpenWrite($msiOutPath)
+                        $installerOutPath = Join-Path $env:Temp $zipArchive.Entries[0].Name
+                        $installerOutStream = [System.IO.File]::OpenWrite($installerOutPath)
                         $buffer = [byte[]]::new(32768)
                         $bytesRead = 0
-                        while (0 -ne ($bytesRead = $msiInStream.Read($buffer, 0, $buffer.length))){
-                            $msiOutStream.Write($buffer, 0, $bytesRead)
+                        while (0 -ne ($bytesRead = $installerInStream.Read($buffer, 0, $buffer.length))){
+                            $installerOutStream.Write($buffer, 0, $bytesRead)
                         }
                         
-                        return $msiOutPath # if everything successfull, this is the return of the function
+                        return $installerOutPath # if everything successfull, this is the return of the function
                     }
                     catch {
-                        if ($msiOutStream) {
-                            $msiOutStream.Dispose() # has to be closed to delete it
-                            $msiOutStream = $null # set to null here so it doesn't try again in finally
-                            if ($msiOutPath -and (Test-Path $msiOutPath)){
-                                Remove-Item $msiOutPath
+                        if ($installerOutStream) {
+                            $installerOutStream.Dispose() # has to be closed to delete it
+                            $installerOutStream = $null # set to null here so it doesn't try again in finally
+                            if ($installerOutPath -and (Test-Path $installerOutPath)){
+                                Remove-Item $installerOutPath
                             }
                         }
                         throw
                     }
                     finally{
-                        if ($msiOutStream) {
-                            $msiOutStream.Dispose()
+                        if ($installerOutStream) {
+                            $installerOutStream.Dispose()
                         }
                     }
                 }
                 finally{
-                    if ($msiInStream) {
-                        $msiInStream.Dispose()
+                    if ($installerInStream) {
+                        $installerInStream.Dispose()
                     }
+                }
                 }
             }
         }
@@ -506,9 +556,93 @@ function GetTempMsiFrom-ByteArray {
             $memStream.Dispose()
         }
     }
+
+    throw "Zip archive must contain a single .msi or .exe file."
 }
 
-function GetTempMsiFrom-Uri {
+function Resolve-LocalInstallerPath {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][string] $Path,
+        [Parameter(Mandatory=$true)][string] $ParameterName,
+        [switch] $AllowExe
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "$ParameterName path does not exist: $Path"
+    }
+
+    $lowerPath = $Path.ToLower()
+    $tempFile = $null
+    $resolvedPath = $null
+    $useExe = $false
+
+    if ($lowerPath.EndsWith(".msi")) {
+        $resolvedPath = $Path
+    }
+    elseif ($AllowExe -and $lowerPath.EndsWith(".exe")) {
+        $resolvedPath = $Path
+        $useExe = $true
+    }
+    elseif ($lowerPath.EndsWith(".zip")) {
+        $installerBytes = [IO.File]::ReadAllBytes($Path)
+        $tempFile = GetTempInstallerFrom-ByteArray $installerBytes
+        $resolvedPath = $tempFile
+        $useExe = $resolvedPath.ToLower().EndsWith(".exe")
+    }
+    else {
+        $allowedFormats = if ($AllowExe) { "MSI, EXE, or ZIP" } else { "ZIP or MSI" }
+        throw "Invalid file format: $Path. Must be $allowedFormats format."
+    }
+
+    Write-Verbose "Resolved $ParameterName to: $resolvedPath"
+
+    return @{
+        ResolvedPath = $resolvedPath
+        TempFile = $tempFile
+        UseExeInstaller = $useExe
+    }
+}
+
+function Test-LocalInstallerVersion {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][string] $LocalInstallerPath,
+        [Parameter(Mandatory=$true)][string] $ParameterName,
+        [string] $InstalledVersion,
+        [bool] $UseExeInstaller = $false
+    )
+
+    if (-not $InstalledVersion) {
+        return
+    }
+
+    if ($UseExeInstaller) {
+        $InstallerVersion = Get-ExeVersion -ExePath $LocalInstallerPath
+        if (-not $InstallerVersion) {
+            throw "Cannot upgrade because EXE version cannot be determined"
+        }
+    }
+    else {
+        $InstallerVersion = Get-MSIVersion -MSIPath $LocalInstallerPath
+        if (-not $InstallerVersion) {
+            throw "Cannot upgrade because MSI version cannot be determined"
+        }
+    }
+
+    $installerType = if ($UseExeInstaller) { 'EXE' } else { 'MSI' }
+    Write-Verbose "Comparing installed version $InstalledVersion with $installerType version $InstallerVersion"
+
+    $Comparison = CompareVersions $InstalledVersion $InstallerVersion
+    if ($Comparison -eq -1) {
+        throw "The currently installed version is more recent than that specified in $ParameterName file. Cannot ""upgrade"" it."
+    }
+    if ($Comparison -eq 0) {
+        throw "The currently installed version is already at the version specified in $ParameterName file. Not upgrading."
+    }
+}
+
+function GetTempInstallerFrom-Uri {
     [CmdletBinding()]
     param (
         [string] $uri,
@@ -520,7 +654,7 @@ function GetTempMsiFrom-Uri {
         throw "Not a valid URI: $uri"
     }
     if (-not ($uri.ToLower().EndsWith(".zip"))) {
-        throw "GetTempMsiFrom-Uri only supports zip archives."
+        throw "GetTempInstallerFrom-Uri only supports zip archives."
     }
 
     # not wrapped in try/catch/finally because $WebContent doesn't have Dispose() method
@@ -535,7 +669,7 @@ function GetTempMsiFrom-Uri {
             throw "Downloaded checksum is incorrect."
         }
     }
-    return GetTempMsiFrom-ByteArray $WebContent.Content
+    return GetTempInstallerFrom-ByteArray $WebContent.Content
 }
 
 function CredProParamMapFromConfig {
@@ -649,7 +783,7 @@ function ParamMapFromJson {
     
     $ParamMap = @{}
     if (-not $JsonConfig) {
-        return $BuiltUpInstallerMap
+        return $ParamMap
     }
 
 	$rawContent = GetJsonRawContent $JsonConfig
@@ -667,6 +801,13 @@ function ParamMapFromJson {
     
     if ($config.MSIPath) {
         $ParamMap["MSIPath"] = $config.MSIPath
+    }
+
+    if ($config.InstallerPath) {
+        $ParamMap["InstallerPath"] = $config.InstallerPath
+    }
+    elseif ($config.EXEPath) {
+        $ParamMap["InstallerPath"] = $config.EXEPath
     }
 
     if ($true -eq $config.DisableUpdate) {
@@ -762,7 +903,7 @@ function MakeMsiExecArgs {
     $msiArgs = @()
     if ($ParamMap) {
         foreach ($key in $ParamMap.Keys) {
-            if ($key -ne "MSIPath") {
+            if ($key -notin @("MSIPath", "InstallerPath", "EXEPath")) {
                 $value = $ParamMap[$key]
                 if (-not [string]::IsNullOrEmpty($value)) {
                     $msiArgs += "$key=`"$value`""
@@ -772,12 +913,10 @@ function MakeMsiExecArgs {
     }
 
     if ($msiArgs.Count -gt 0) {
-        return $msiArgs
+        return @($msiArgs)
     }
 
-    # PowerShell returns $null if the array is empty, this is the idiosyncratic way
-    # of avoiding that error/"feature"
-    return , $msiArgs
+    return @()
 }
 
 function InstallMsi {
@@ -789,7 +928,10 @@ function InstallMsi {
         [string] $LogFileName
     )
 
-    $localParams = $MsiParameters.Clone()
+    $localParams = @()
+    if ($MsiParameters) {
+        $localParams += $MsiParameters
+    }
     $localParams += "/i"
     $localParams += "`"$MsiPath`""
     if (-not $Interactive) {
@@ -802,7 +944,37 @@ function InstallMsi {
     }
 
     Write-Verbose "Local params: $localParams"
-    $process = Start-Process 'msiexec.exe' -ArgumentList $localParams -Wait -Passthru
+    $process = Start-InstallerProcess -FilePath 'msiexec.exe' -ArgumentList $localParams
+    if ($process.ExitCode -ne 0) {
+        throw "Installer process error, exit code: $($process.ExitCode)"
+    }
+}
+
+function InstallExe {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$false)][string] $ExePath,
+        [array] $InstallerParameters,
+        [bool] $Interactive,
+        [string] $LogFileName
+    )
+
+    $localParams = @()
+    if ($InstallerParameters) {
+        $localParams += $InstallerParameters
+    }
+    if (-not $Interactive) {
+        $localParams += "/exenoui"
+        $localParams += "/qn"
+    }
+
+    if (-not [string]::IsNullOrEmpty($LogFileName)){
+        $localParams += "/log"
+        $localParams += $LogFileName
+    }
+
+    Write-Verbose "Local params: $localParams"
+    $process = Start-InstallerProcess -FilePath $ExePath -ArgumentList $localParams
     if ($process.ExitCode -ne 0) {
         throw "Installer process error, exit code: $($process.ExitCode)"
     }
@@ -926,7 +1098,7 @@ function DoRemoveAgent()
     }
 
     Write-Verbose "local params: $localParams"
-    Start-Process "msiexec.exe" -ArgumentList $localParams -Wait
+    Start-InstallerProcess -FilePath "msiexec.exe" -ArgumentList $localParams | Out-Null
 }
 
 function Get-MSIVersion {
@@ -964,6 +1136,30 @@ function Get-MSIVersion {
         if ($view) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($view) | Out-Null }
         if ($database) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null }
         if ($windowsInstaller) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($windowsInstaller) | Out-Null }
+    }
+}
+
+function Get-ExeVersion {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$ExePath
+    )
+
+    try {
+        $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($ExePath)
+        $version = $versionInfo.ProductVersion
+        if ([string]::IsNullOrWhiteSpace($version)) {
+            $version = $versionInfo.FileVersion
+        }
+        if ([string]::IsNullOrWhiteSpace($version)) {
+            return $null
+        }
+
+        return $version.Trim()
+    }
+    catch {
+        Write-Error "Error reading EXE version: $_"
+        return $null
     }
 }
 
@@ -1176,6 +1372,13 @@ if (-not $Json) {
     if ($MSIPath) {
         $MapForJson += @{ MSIPath = $MSIPath}
     }
+    if ($InstallerPath) {
+        $MapForJson += @{ InstallerPath = $InstallerPath}
+    }
+
+    if ($MSIPath -and $InstallerPath) {
+        throw "MSIPath and InstallerPath cannot both be supplied."
+    }
 	
 	if ($CustomImage) {
 		$MapForJson += @{ CustomImage = $CustomImage}
@@ -1200,75 +1403,64 @@ if ($Dictionary) {
 
 Write-Verbose "ParamMap: $($ParamMap.Keys)"
 
-$MSIParams = MakeMsiExecArgs $ParamMap
+if ($ParamMap.MSIPath -and $ParamMap.InstallerPath) {
+    throw "MSIPath and InstallerPath cannot both be supplied."
+}
+
+$InstallerParams = @(MakeMsiExecArgs $ParamMap)
 
 $BaseUrl, $InfoUrl = GetBaseUrlAndInfoUrl -beta:$Beta
 
-if (-not $ParamMap.MSIPath) { ### we have to download the file ...
+$ResolvedInstallerFile = $null
+$TempInstallerFile = $null
+$UseExeInstaller = $false
+
+if (-not $ParamMap.MSIPath -and -not $ParamMap.InstallerPath) { ### we have to download the file ...
 
     $LatestInfo = GetLatestInfo $InfoUrl
     if ($Upgrade){
         VerifyVersionForUpgrade $LatestInfo.version
     }
 
-    Write-Verbose "ParamMap MSIPath is empty, downloading latest"
+    Write-Verbose "ParamMap MSIPath and InstallerPath are empty, downloading latest"
     $LatestUrl = $BaseUrl + $LatestInfo.Name
     Write-Verbose "Downloading latest URL: $LatestUrl"
 
     Write-Verbose "Checksum=$($LatestInfo.Checksum)"
-    $TempMsiFile = GetTempMsiFrom-Uri $LatestUrl $LatestInfo.checksum # this creates a temp file which we will cleanup later
-    $MSIPath = $TempMsiFile
+    $TempInstallerFile = GetTempInstallerFrom-Uri $LatestUrl $LatestInfo.checksum # this creates a temp file which we will cleanup later
+    $ResolvedInstallerFile = $TempInstallerFile
+    $UseExeInstaller = $ResolvedInstallerFile.ToLower().EndsWith(".exe")
+} elseif ($ParamMap.InstallerPath) {
+    $resolved = Resolve-LocalInstallerPath -Path $ParamMap.InstallerPath -ParameterName "InstallerPath" -AllowExe
+    $ResolvedInstallerFile = $resolved.ResolvedPath
+    $TempInstallerFile = $resolved.TempFile
+    $UseExeInstaller = $resolved.UseExeInstaller
+
+    Test-LocalInstallerVersion -LocalInstallerPath $ResolvedInstallerFile -ParameterName "InstallerPath" -InstalledVersion $InstalledVersion -UseExeInstaller $UseExeInstaller
 } else {
-    if (-not (Test-Path $ParamMap.MSIPath)) {
-        throw "MSI path does not exist: $($ParamMap.MSIPath)"
-    } else {
-        if ($ParamMap.MsiPath.ToLower().EndsWith(".msi")) {
-            $MSIPath = $ParamMap.MSIPath
-        }
-        elseif ($ParamMap.MSIPath.ToLower().EndsWith(".zip")) {
-            $msiBytes = [IO.File]::ReadAllBytes($ParamMap.MSIPath)
-            $TempMsiFile = GetTempMsiFrom-ByteArray $msiBytes
-            $MSIPath = $TempMsiFile
-        }
-        else {
-            throw "Invalid file format: $($ParamMap.MSIPath). Must be ZIP or MSI format."
-        }
-        Write-Verbose "Setting MSIPath to file in JSON config file: $MsiPath"
+    $resolved = Resolve-LocalInstallerPath -Path $ParamMap.MSIPath -ParameterName "MSIPath"
+    $ResolvedInstallerFile = $resolved.ResolvedPath
+    $TempInstallerFile = $resolved.TempFile
+    $UseExeInstaller = $resolved.UseExeInstaller
 
-        $MSIVersion = Get-MSIVersion -MSIPath $MSIPath
-
-        if ($InstalledVersion) {
-            if (-not $MSIVersion) {
-                throw "Cannot upgrade because MSI version cannot be determined"
-            }
-
-            $Comparison = CompareVersions $InstalledVersion $MSIVersion
-            if ($Comparison -eq -1) {
-                throw "The currently installed version is more recent than that specified in MSIPath file. Cannot ""upgrade"" it."
-            }
-            if ($Comparison -eq 0) {
-                throw "The currently installed version is already at the version specified in MSIPath file. Not upgrading."
-            }
-        }
-    }
+    Test-LocalInstallerVersion -LocalInstallerPath $ResolvedInstallerFile -ParameterName "MSIPath" -InstalledVersion $InstalledVersion -UseExeInstaller $UseExeInstaller
 }
 
 try {
     $DebugFlag = if ($PSCmdlet.MyInvocation.BoundParameters["Debug"].IsPresent) {$true} else {$false}
-    Write-Output "MSI path for installer: $MSIPath"
-    Write-Output "InstallerParams: $($MSIParams | Where-Object {$DebugFlag -or (-not $_.StartsWith('APIKEY') -and -not $_.StartsWith('SECRET'))} )"
+    Write-Output "Installer path: $ResolvedInstallerFile"
+    Write-Output "InstallerParams: $(@($InstallerParams) | Where-Object {$DebugFlag -or (-not $_.StartsWith('APIKEY') -and -not $_.StartsWith('SECRET'))} )"
 
     if ($DebugFlag) {
         return "Quitting because Debug flag was used"
     }
-    
-    $InstallMSIArgs = @{
-        MsiPath = $MSIPath
-        MsiParameters = $MSIParams
-        Interactive = $Interactive
-        LogFileName = if ($Log) { GetLogFileName $ProductType $true } else { "" }
+
+    $LogFileName = if ($Log) { GetLogFileName $ProductType $true } else { "" }
+    if ($UseExeInstaller) {
+        InstallExe -ExePath $ResolvedInstallerFile -InstallerParameters $InstallerParams -Interactive $Interactive -LogFileName $LogFileName
+    } else {
+        InstallMsi -MsiPath $ResolvedInstallerFile -MsiParameters $InstallerParams -Interactive $Interactive -LogFileName $LogFileName
     }
-    InstallMSI @InstallMSIArgs
 
     $JsonMap = ConvertFrom-Json (GetJsonRawContent $json)
     SetCustomPrompt $JsonMap.CustomPrompt
@@ -1286,8 +1478,8 @@ try {
 	
 }
 finally {
-    if ($TempMsiFile -and (Test-Path $TempMsiFile)) {
-        Write-Verbose "Deleting $TempMsiFile"
-        Remove-Item $TempMsiFile
+    if ($TempInstallerFile -and (Test-Path $TempInstallerFile)) {
+        Write-Verbose "Deleting $TempInstallerFile"
+        Remove-Item $TempInstallerFile
     }
 }
