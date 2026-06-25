@@ -960,17 +960,21 @@ function InstallExe {
     )
 
     $localParams = @()
-    if ($InstallerParameters) {
-        $localParams += $InstallerParameters
-    }
     if (-not $Interactive) {
         $localParams += "/exenoui"
         $localParams += "/qn"
     }
 
     if (-not [string]::IsNullOrEmpty($LogFileName)){
-        $localParams += "/log"
+        $localParams += "/exelog"
         $localParams += $LogFileName
+    }
+
+    if ($InstallerParameters) {
+        $InstallerParameters = $InstallerParameters | ForEach-Object {
+            $_ -replace '="([^"]*)"$', '=$1'
+        }
+        $localParams += $InstallerParameters
     }
 
     Write-Verbose "Local params: $localParams"
