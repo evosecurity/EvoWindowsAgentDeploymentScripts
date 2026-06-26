@@ -336,7 +336,7 @@ function Start-InstallerProcess {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][string] $FilePath,
-        [array] $ArgumentList
+        $ArgumentList
     )
 
     $startParams = @{
@@ -344,7 +344,7 @@ function Start-InstallerProcess {
         Wait = $true
         PassThru = $true
     }
-    if ($ArgumentList -and $ArgumentList.Count -gt 0) {
+    if ($ArgumentList) {
         $startParams['ArgumentList'] = $ArgumentList
     }
     if (-not (IsRunningAsAdministrator)) {
@@ -928,23 +928,29 @@ function InstallMsi {
         [string] $LogFileName
     )
 
-    $localParams = @()
-    if ($MsiParameters) {
-        $localParams += $MsiParameters
-    }
-    $localParams += "/i"
-    $localParams += "`"$MsiPath`""
+    $argString = "/i `"$MsiPath`""
     if (-not $Interactive) {
-        $localParams += "/qn"
+        $argString += " /qn"
     }
 
     if (-not [string]::IsNullOrEmpty($LogFileName)){
-        $localParams += "/log"
-        $localParams += $LogFileName
+        $argString += " /log `"$LogFileName`""
     }
 
-    Write-Verbose "Local params: $localParams"
-    $process = Start-InstallerProcess -FilePath 'msiexec.exe' -ArgumentList $localParams
+    if ($MsiParameters) {
+        foreach ($param in $MsiParameters) {
+            if ($null -ne $param -and $param -match '\s') {
+                $escaped = $param -replace '"', '\"'
+                $argString += " `"$escaped`""
+            }
+            elseif ($null -ne $param) {
+                $argString += " $param"
+            }
+        }
+    }
+
+    Write-Verbose "Local params: $argString"
+    $process = Start-InstallerProcess -FilePath 'msiexec.exe' -ArgumentList $argString
     if ($process.ExitCode -ne 0) {
         throw "Installer process error, exit code: $($process.ExitCode)"
     }
@@ -959,22 +965,29 @@ function InstallExe {
         [string] $LogFileName
     )
 
-    $localParams = @()
-    if ($InstallerParameters) {
-        $localParams += $InstallerParameters
-    }
+    $argString = ''
     if (-not $Interactive) {
-        $localParams += "/exenoui"
-        $localParams += "/qn"
+        $argString += '/exenoui /qn'
     }
 
     if (-not [string]::IsNullOrEmpty($LogFileName)){
-        $localParams += "/log"
-        $localParams += $LogFileName
+        $argString += " /exelog `"$LogFileName`""
     }
 
-    Write-Verbose "Local params: $localParams"
-    $process = Start-InstallerProcess -FilePath $ExePath -ArgumentList $localParams
+    if ($InstallerParameters) {
+        foreach ($param in $InstallerParameters) {
+            $cleanParam = $param -replace '="([^"]*)"$', '=$1'
+            if ($cleanParam -match '\s') {
+                $argString += " `"$cleanParam`""
+            }
+            else {
+                $argString += " $cleanParam"
+            }
+        }
+    }
+
+    Write-Verbose "Local params: $argString"
+    $process = Start-InstallerProcess -FilePath $ExePath -ArgumentList $argString
     if ($process.ExitCode -ne 0) {
         throw "Installer process error, exit code: $($process.ExitCode)"
     }
