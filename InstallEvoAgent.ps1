@@ -116,7 +116,7 @@ param(
     [string] $Json,
 
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
-    [string] $DeploymentToken,
+    [string] $DeploymentToken = $env:EVO_DEPLOYMENT_TOKEN,
 
     [Parameter(ParameterSetName='CommandLineConfig')]
     [string] $EnvironmentUrl,
@@ -221,12 +221,12 @@ param(
     [switch] $Beta,
 
     [Parameter(ParameterSetName='RemoveConfig')]
-    [switch] $Remove,
+    [switch] $Remove = ($env:EVO_REMOVE_NOW -eq "true"),
 
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
     [Parameter(ParameterSetName='JsonConfig')]
     [Parameter(ParameterSetName='CommandLineConfig')]
-    [switch] $Upgrade,
+    [switch] $Upgrade = ($env:EVO_UPGRADE_NOW -eq "true"),
 
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
     [Parameter(ParameterSetName='JsonConfig')]
@@ -238,7 +238,7 @@ param(
     [Parameter(ParameterSetName='JsonConfig')]
     [Parameter(ParameterSetName='CommandLineConfig')]
     [Parameter(ParameterSetName='RemoveConfig')]
-    [switch] $Log,
+    [switch] $Log = ($env:EVO_LOG_OUTPUT -eq "true"),
 
     [Parameter(ParameterSetName='HelpSet')]
     [switch] $Help
