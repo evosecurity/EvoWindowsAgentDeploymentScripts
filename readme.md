@@ -28,7 +28,7 @@ This repository contains PowerShell scripts to install, upgrade, or remove the *
 
 ### ✔️ Features
 
-- Installs the Evo Windows Agent MSI or ZIP package (automatically extracts ZIP)
+- Installs the Evo Windows Agent from an MSI, EXE, or ZIP package (ZIP is automatically extracted; must contain a single `.msi` or `.exe`)
 - Automatically downloads the latest stable or beta version if no path is provided
 - Supports uninstall/removal logic
 - Silent mode support for unattended installations
@@ -67,7 +67,8 @@ Minimum supported Agent version for any option is 2.3 unless indicated otherwise
 | `-UnlimitedExtendedUacSession`  | Optional setting to enable unlimited extended UAC session  (Minimum supported agent = 2.4)                                                              | 0                      |
 | `-PersistentRequest`      | Optional setting to enable persistent elevation request notifications instead of having a 10 second timeout (Minimum supported agent = 2.4)                   | 0                      |
 | `-RMM`                    | Optional setting to enable RMM (Remote Monitoring and Management) functionality. Only Ninja deployment token retrieval for now (Minimum supported agent = 2.5)|                        |
-| `-MSIPath`                | Optional path to `.msi` or `.zip` file                                                                                                                        |                        |
+| `-MSIPath`                | Optional path to `.msi` or `.zip` file (legacy; mutually exclusive with `-InstallerPath`)                                                                     |                        |
+| `-InstallerPath`          | Optional path to `.msi`, `.exe`, or `.zip` file (mutually exclusive with `-MSIPath`; ZIP must contain a single `.msi` or `.exe`)                              |                        |
 | `-Upgrade`                | Ensure only newer versions replace installed ones                                                                                                             |                        |
 | `-Remove`                 | Uninstalls the Evo Credential Provider                                                                                                                        |                        |
 | `-Interactive`            | Runs installer with UI instead of silent mode                                                                                                                 |                        |
@@ -115,6 +116,14 @@ In this case, `evoDeploymentToken` is the property you've defined to hold the de
 ```powershell
 .\InstallEvoAgent.ps1 -Upgrade -Log
 ```
+
+### Install from a Local MSI, EXE, or ZIP File
+
+```powershell
+.\InstallEvoAgent.ps1 -DeploymentToken "deptoken123abc" -InstallerPath ".\evoagentsetup.exe"
+```
+
+Use `-InstallerPath` for `.msi`, `.exe`, or `.zip` files. For backwards compatibility, `-MSIPath` still accepts `.msi` and `.zip` files.
 
 ### Removal
 
