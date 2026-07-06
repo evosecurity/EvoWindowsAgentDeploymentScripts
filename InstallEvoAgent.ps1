@@ -75,7 +75,8 @@
     Optional setting to enable persistent elevation request notifications instead of having a 10 second timeout
 
 .PARAMETER TamperUninstallPassword
-    Optional password required before uninstalling the Evo Windows Agent
+    Optional uninstall password. When installing, sets the password required before uninstalling.
+    When removing (-Remove), supplies the password so silent uninstall can proceed without a prompt.
 
 .PARAMETER RMM
     Optional setting to enable RMM (Remote Monitoring and Management) functionality. Only Ninja deployment token retrieval for now. 
@@ -160,6 +161,7 @@ param(
 
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
     [Parameter(ParameterSetName='CommandLineConfig')]
+    [Parameter(ParameterSetName='RemoveConfig')]
     [string] $TamperUninstallPassword,
 
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
@@ -272,6 +274,9 @@ Usage Examples:
   Remove:
     .\InstallEvoAgent.ps1 -Remove -Interactive -Log
 
+  Silent remove (when uninstall password protection is enabled):
+    .\InstallEvoAgent.ps1 -Remove -TamperUninstallPassword "your-uninstall-password" -Log
+
   Install from MSI or zip file (legacy):
     .\InstallEvoAgent.ps1 -EnvironmentUrl "..." -EvoDirectory "..." -AccessToken "..." -Secret "..." -MSIPath ".\agent.zip"
 
@@ -305,7 +310,7 @@ Parameters:
   -DisableEvoUac          Optional setting to disable the Evo credential in the UAC dialog (defaults off or value of previous install, minimum supported agent = 2.4)
   -UnlimitedExtendedUacSession Optional setting to enable unlimited extended UAC session (defaults off or value of previous install, minimum supported agent = 2.4)
   -PersistentRequest      Optional setting to enable persistent elevation request notifications instead of having a 10 second timeout (defaults off or value of previous install, minimum supported agent = 2.4)
-  -TamperUninstallPassword Optional password required before uninstalling the Evo Windows Agent
+  -TamperUninstallPassword Optional uninstall password (set on install, or supply with -Remove for silent uninstall)
   -RMM                    Optional setting to enable RMM (Remote Monitoring and Management) functionality -- only Ninja deployment token retrieval for now
   -MSIPath                Optional .msi or .zip file path (legacy; mutually exclusive with InstallerPath)
   -InstallerPath          Optional .msi, .exe, or .zip file path (mutually exclusive with MSIPath)
@@ -1092,7 +1097,8 @@ function DoRemoveAgent()
 {
     param(
         [bool] $Interactive,
-        [bool] $Log
+        [bool] $Log,
+        [string] $TamperUninstallPassword
     )
 
     $DisplayNames = GetInstalledDisplayNames
@@ -1111,19 +1117,31 @@ function DoRemoveAgent()
     }
     Write-Verbose "SoftwareKey: $softwareKey"
 
-    $localParams = @("/X", "`"$($softwareKey.PSChildName)`"")
+    $argString = "/X `"$($softwareKey.PSChildName)`""
     if (-not $Interactive) {
-        $localParams += "/qn"
+        $argString += " /qn"
     }
 
     if ($Log) {
         $LogFileName = Join-Path $Env:TEMP "EvoAgent_remove.log"
-        $localParams += "/log"
-        $localParams += $LogFileName
+        $argString += " /log `"$LogFileName`""
     }
 
-    Write-Verbose "local params: $localParams"
-    Start-InstallerProcess -FilePath "msiexec.exe" -ArgumentList $localParams | Out-Null
+    if ($TamperUninstallPassword) {
+        $msiPropertyArgs = MakeMsiExecArgs @{ TAMPER_UNINSTALL_PASSWORD = $TamperUninstallPassword.Trim() }
+        foreach ($param in $msiPropertyArgs) {
+            if ($null -ne $param -and $param -match '\s') {
+                $escaped = $param -replace '"', '\"'
+                $argString += " `"$escaped`""
+            }
+            elseif ($null -ne $param) {
+                $argString += " $param"
+            }
+        }
+    }
+
+    Write-Verbose "local params: $argString"
+    Start-InstallerProcess -FilePath "msiexec.exe" -ArgumentList $argString | Out-Null
 }
 
 function Get-MSIVersion {
@@ -1307,7 +1325,7 @@ if (-not $Interactive -and -not (IsRunningAsAdministrator)) {
 }
 
 if ($Remove) {
-    return DoRemoveAgent $Interactive $Log
+    return DoRemoveAgent $Interactive $Log $TamperUninstallPassword
 }
 
 $InstalledVersion = GetInstalledVersion
