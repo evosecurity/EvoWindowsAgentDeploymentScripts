@@ -54,6 +54,7 @@ Minimum supported Agent version for any option is 2.3 unless indicated otherwise
 | `-OnlyEvoLoginCredential` | If set, Evo becomes the only credential provider                                                                                                              | 0                      |
 | `-RememberLastUserName`   | Optional flag to remember the last username used                                                                                                              | 1                      |
 | `-DisableUpdate`          | Optional flag to disable auto updates                                                                                                                         | 0                      |
+| `-TamperUninstallPassword` | Optional uninstall password (set on install, or supply with `-Remove` for silent uninstall)                                                                      |                        |
 | `-JitMode`                | Optional flag to enable Just-In-Time admin accounts                                                                                                           | 0                      |
 | `-EndUserElevation`       | Optional flag to enable end-user elevation                                                                                                                    | 0                      |
 | `-UserAdminEscalation`    | Optional flag to prompt admins with the end-user elevation prompt instead of the standard UAC prompt                                                          | 0                      |
@@ -90,6 +91,12 @@ When upgrading, any unspecified parameters are inherited from the previous insta
 .\InstallEvoAgent.ps1 -DeploymentToken "deptoken123abc"
 ```
 
+### Install with uninstall password protection
+
+```powershell
+.\InstallEvoAgent.ps1 -DeploymentToken "deptoken123abc" -TamperUninstallPassword "your-uninstall-password"
+```
+
 ### Install with Ninja deployment token retrieval (agent 2.5+)
 
 In this case, `evoDeploymentToken` is the property you've defined to hold the deployment token in your Ninja configuration
@@ -122,6 +129,12 @@ Use `-InstallerPath` for `.msi`, `.exe`, or `.zip` files. For backwards compatib
 
 ```powershell
 .\InstallEvoAgent.ps1 -Remove -Interactive -Log
+```
+
+### Silent removal (when uninstall password protection is enabled)
+
+```powershell
+.\InstallEvoAgent.ps1 -Remove -TamperUninstallPassword "your-uninstall-password" -Log
 ```
 
 ### Legacy JSON Blob
