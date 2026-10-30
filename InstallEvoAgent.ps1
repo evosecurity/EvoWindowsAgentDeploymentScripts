@@ -9,6 +9,11 @@
 .PARAMETER DeploymentToken
     The deployment token from the Evo Admin portal
 
+.PARAMETER TenantName
+    Tenant to place this machine in when the deployment token is an MSP-wide key. Ignored for
+    tenant-specific tokens. Defaults to $env:EVO_TENANT_NAME, then the NinjaOne organization
+    ($env:NINJA_ORGANIZATION_NAME), then the Datto RMM site ($env:CS_PROFILE_NAME).
+
 .PARAMETER EnvironmentUrl
     The Evo environment URL (e.g. https://yourorg.evosecurity.com)
 
@@ -114,13 +119,18 @@
     Requires administrator privileges unless run in interactive mode
 #>
 
-[CmdletBinding(DefaultParameterSetName='CommandLineConfig')]
+# DeploymentTokenConfig is the default so an RMM can run the script with no arguments and only
+# $env:EVO_DEPLOYMENT_TOKEN set. Legacy callers pass -EnvironmentUrl, which selects CommandLineConfig.
+[CmdletBinding(DefaultParameterSetName='DeploymentTokenConfig')]
 param(
     [Parameter(ParameterSetName='JsonConfig')]
     [string] $Json,
 
     [Parameter(ParameterSetName='DeploymentTokenConfig')]
     [string] $DeploymentToken = $env:EVO_DEPLOYMENT_TOKEN,
+
+    [Parameter(ParameterSetName='DeploymentTokenConfig')]
+    [string] $TenantName,
 
     [Parameter(ParameterSetName='CommandLineConfig')]
     [string] $EnvironmentUrl,
@@ -384,6 +394,20 @@ function GetInstalledDisplayName()
 function GetInstalledDisplayNames()
 {
     return "Evo Agent","Evo Secure Login"
+}
+
+# Tenant name hint for MSP-wide keys: explicit value, then Evo's env var, then what the RMM exposes.
+function Resolve-TenantName {
+    param (
+        [string]$TenantName
+    )
+
+    foreach ($candidate in $TenantName, $env:EVO_TENANT_NAME, $env:NINJA_ORGANIZATION_NAME, $env:CS_PROFILE_NAME) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+            return $candidate.Trim()
+        }
+    }
+    return ''
 }
 
 # For now only Ninja is supported, and only for the DeploymentToken property
@@ -708,6 +732,10 @@ function CredProParamMapFromConfig {
 
     if ($config.DeploymentToken) {
         $ParamMap["DEPLOYMENT_TOKEN_VALUE"] = $config.DeploymentToken
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($config.TenantName)) {
+        $ParamMap["EVO_TENANT_NAME"] = $config.TenantName
     }
 
     if ($config.EnvironmentUrl) {
@@ -1346,6 +1374,10 @@ if (-not $Json) {
     
     if ($DeploymentToken) {
         $MapForJson += @{ DeploymentToken = $DeploymentToken}
+        $ResolvedTenantName = Resolve-TenantName -TenantName $TenantName
+        if ($ResolvedTenantName) {
+            $MapForJson += @{ TenantName = $ResolvedTenantName}
+        }
     }
     if ($EnvironmentUrl) {
         $MapForJson += @{ EnvironmentUrl = $EnvironmentUrl}
