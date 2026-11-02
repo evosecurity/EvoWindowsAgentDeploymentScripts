@@ -45,7 +45,7 @@ Minimum supported Agent version for any option is 2.3 unless indicated otherwise
 | Parameter                 | Description                                                                                                                                                   | Default                |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
 | `-DeploymentToken`        | Deployment token from portal (Minimum supported agent = 2.5. Now the preferred method)                                                                        |                        |
-| `-TenantName`             | Tenant for this machine when the token is an MSP-wide key (ignored for tenant tokens). Falls back to `$env:EVO_TENANT_NAME`, NinjaOne organization, then Datto site (agent 3.2+) |                        |
+| `-TenantName`             | Tenant for this machine when the token is an MSP-wide key (ignored for tenant tokens). Falls back to `$env:EVO_TENANT_NAME`, NinjaOne organization, then Datto site (agent 3.1+) |                        |
 | `-EnvironmentUrl`         | Evo portal base URL (e.g., `https://yourorg.evosecurity.com`)                                                                                                 |                        |
 | `-EvoDirectory`           | Your Evo organization/directory name                                                                                                                          |                        |
 | `-AccessToken`            | Evo API access token                                                                                                                                          |                        |
@@ -231,7 +231,7 @@ When upgrading, any unspecified parameters are inherited from the previous insta
 The script needs only a deployment token. With no arguments it reads `$env:EVO_DEPLOYMENT_TOKEN`, so any tool that can set an environment variable (or pass one argument) and run PowerShell as SYSTEM can deploy the agent. Pin the script to a release tag rather than `master`:
 
 ```powershell
-$url = 'https://raw.githubusercontent.com/evosecurity/EvoWindowsAgentDeploymentScripts/v1.0.0/InstallEvoAgent.ps1'
+$url = 'https://raw.githubusercontent.com/evosecurity/EvoWindowsAgentDeploymentScripts/v1.1.0/InstallEvoAgent.ps1'
 Invoke-WebRequest $url -OutFile "$env:TEMP\InstallEvoAgent.ps1" -UseBasicParsing
 & "$env:TEMP\InstallEvoAgent.ps1" -DeploymentToken '<token>' -Log
 ```
@@ -279,7 +279,7 @@ Devices > Scripts and remediations > Platform scripts > Add (Windows 10 and late
 ```powershell
 $env:EVO_DEPLOYMENT_TOKEN = '<token>'
 $env:EVO_TENANT_NAME = '<customer name>'   # only for MSP-wide keys
-$url = 'https://raw.githubusercontent.com/evosecurity/EvoWindowsAgentDeploymentScripts/v1.0.0/InstallEvoAgent.ps1'
+$url = 'https://raw.githubusercontent.com/evosecurity/EvoWindowsAgentDeploymentScripts/v1.1.0/InstallEvoAgent.ps1'
 Invoke-WebRequest $url -OutFile "$env:TEMP\InstallEvoAgent.ps1" -UseBasicParsing
 & "$env:TEMP\InstallEvoAgent.ps1" -Log
 ```
