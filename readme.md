@@ -269,9 +269,11 @@ Create an agent procedure that writes the script file and runs **Execute PowerSh
 ```
 
 ### Syncro
-Add the script to the Script library (PowerShell, run as System). Add two Script Variables of type **Platform**: `EvoDeploymentToken` = `{{customer_custom_field_evo_deployment_token}}` and `CustomerBusinessName` = `{{customer_business_name}}`, then:
+Create a script in the Script library (PowerShell, run as System) with this body. Syncro doesn't put `InstallEvoAgent.ps1` on the endpoint, so the script downloads the pinned copy. Add two Script Variables of type **Platform**: `EvoDeploymentToken` = `{{customer_custom_field_evo_deployment_token}}` and `CustomerBusinessName` = `{{customer_business_name}}`:
 ```powershell
-.\InstallEvoAgent.ps1 -DeploymentToken $EvoDeploymentToken -TenantName $CustomerBusinessName -Log
+$url = 'https://raw.githubusercontent.com/evosecurity/EvoWindowsAgentDeploymentScripts/v1.1.0/InstallEvoAgent.ps1'
+Invoke-WebRequest $url -OutFile "$env:TEMP\InstallEvoAgent.ps1" -UseBasicParsing
+& "$env:TEMP\InstallEvoAgent.ps1" -DeploymentToken $EvoDeploymentToken -TenantName $CustomerBusinessName -Log
 ```
 
 ### Microsoft Intune (Platform script)
@@ -285,11 +287,17 @@ Invoke-WebRequest $url -OutFile "$env:TEMP\InstallEvoAgent.ps1" -UseBasicParsing
 ```
 
 ### Group Policy (computer startup script)
-Computer Configuration > Policies > Windows Settings > Scripts > Startup > PowerShell Scripts. Add `InstallEvoAgent.ps1` from a share readable by Domain Computers with parameters:
+Computer Configuration > Policies > Windows Settings > Scripts > Startup > PowerShell Scripts. Don't put the token in the script parameters: Group Policy stores them in `psscripts.ini` in SYSVOL, which every authenticated user can read. Add this wrapper as the startup script (no parameters) instead. Keep `InstallEvoAgent.ps1` and a `token.txt` holding the deployment token on a share whose ACL grants read to **Domain Computers only**:
+```powershell
+$share = '\\fileserver\evo$'   # readable by Domain Computers only
+$token = (Get-Content "$share\token.txt" -Raw).Trim()
+# -Upgrade refuses a computer with no agent, so pass it only once the agent is installed;
+# then re-runs at each boot don't reinstall the same version.
+$installed = Get-ChildItem HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall |
+    Where-Object { $_.GetValue('DisplayName') -in 'Evo Agent', 'Evo Secure Login' }
+$extra = if ($installed) { @('-Upgrade') } else { @() }
+& "$share\InstallEvoAgent.ps1" -DeploymentToken $token @extra -Log
 ```
--DeploymentToken "<token>" -Upgrade -Log
-```
-`-Upgrade` keeps re-runs at each boot from reinstalling the same version.
 
 ---
 
