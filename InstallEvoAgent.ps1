@@ -10,7 +10,7 @@
     The deployment token from the Evo Admin portal
 
 .PARAMETER TenantName
-    Tenant to place this machine in when the deployment token is an MSP-wide key. Ignored for
+    Tenant to place this machine in when the deployment token is a Global Deployment Token. Ignored for
     tenant-specific tokens. Defaults to $env:EVO_TENANT_NAME, then the NinjaOne organization
     ($env:NINJA_ORGANIZATION_NAME), then the Datto RMM site ($env:CS_PROFILE_NAME).
 
@@ -396,7 +396,7 @@ function GetInstalledDisplayNames()
     return "Evo Agent","Evo Secure Login"
 }
 
-# Tenant name hint for MSP-wide keys: explicit value, then Evo's env var, then what the RMM exposes.
+# Tenant name hint for Global Deployment Tokens: explicit value, then Evo's env var, then what the RMM exposes.
 function Resolve-TenantName {
     param (
         [string]$TenantName
