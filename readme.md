@@ -236,7 +236,7 @@ Invoke-WebRequest $url -OutFile "$env:TEMP\InstallEvoAgent.ps1" -UseBasicParsing
 & "$env:TEMP\InstallEvoAgent.ps1" -DeploymentToken '<token>' -Log
 ```
 
-**Global Deployment Tokens.** If the token is a Global Deployment Token, the machine is placed in the tenant named by `-TenantName`. Without it, the script uses `$env:EVO_TENANT_NAME`, then the NinjaOne organization (`$env:NINJA_ORGANIZATION_NAME`), then the Datto RMM site (`$env:CS_PROFILE_NAME`). A name Evo doesn't know creates the tenant; a likely typo of an existing tenant lands in **Unassigned** for review in the portal.
+**Global Deployment Tokens.** If the token is a Global Deployment Token, the machine is placed in the tenant named by `-TenantName`. Without it, the script uses `$env:EVO_TENANT_NAME`, then the NinjaOne organization (`$env:NINJA_ORGANIZATION_NAME`), then the Datto RMM site (`$env:CS_PROFILE_NAME`). A name Evo doesn't know creates the tenant; a likely typo of an existing tenant waits as a pending install until an Evo admin assigns it (Endpoints > Computers > Installs waiting for a customer). The script still reports success, so the RMM doesn't retry.
 
 ### NinjaOne
 Store the token in a custom field (e.g. `evoDeploymentToken`) and run the script as SYSTEM:
