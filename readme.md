@@ -18,6 +18,7 @@ This repository contains PowerShell scripts to install, upgrade, or remove the *
   - [🔧 Parameters](#-parameters-1)
   - [🚀 Example Usages](#-example-usages-1)
 
+- [🧰 Deploying from an RMM or MDM](#-deploying-from-an-rmm-or-mdm)
 - [⚠️ Notes](#️-notes)
 - [📬 Support](#-support)
 - [📝 License](#-license)
@@ -44,6 +45,7 @@ Minimum supported Agent version for any option is 2.3 unless indicated otherwise
 | Parameter                 | Description                                                                                                                                                   | Default                |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
 | `-DeploymentToken`        | Deployment token from portal (Minimum supported agent = 2.5. Now the preferred method)                                                                        |                        |
+| `-TenantName`             | Tenant for this machine when the token is a Global Deployment Token (ignored for tenant tokens). Falls back to `$env:EVO_TENANT_NAME`, NinjaOne organization, then Datto site (agent 3.1+) |                        |
 | `-EnvironmentUrl`         | Evo portal base URL (e.g., `https://yourorg.evosecurity.com`)                                                                                                 |                        |
 | `-EvoDirectory`           | Your Evo organization/directory name                                                                                                                          |                        |
 | `-AccessToken`            | Evo API access token                                                                                                                                          |                        |
@@ -220,6 +222,81 @@ When upgrading, any unspecified parameters are inherited from the previous insta
 
 ```powershell
 .\InstallLdapAgent.ps1 -Json 'c:\path\to\install.json'
+```
+
+---
+
+## 🧰 Deploying from an RMM or MDM
+
+The script needs only a deployment token. With no arguments it reads `$env:EVO_DEPLOYMENT_TOKEN`, so any tool that can set an environment variable (or pass one argument) and run PowerShell as SYSTEM can deploy the agent. Pin the script to a release tag rather than `master`:
+
+```powershell
+$url = 'https://raw.githubusercontent.com/evosecurity/EvoWindowsAgentDeploymentScripts/v1.1.0/InstallEvoAgent.ps1'
+Invoke-WebRequest $url -OutFile "$env:TEMP\InstallEvoAgent.ps1" -UseBasicParsing
+& "$env:TEMP\InstallEvoAgent.ps1" -DeploymentToken '<token>' -Log
+```
+
+**Global Deployment Tokens.** If the token is a Global Deployment Token, the machine is placed in the tenant named by `-TenantName`. Without it, the script uses `$env:EVO_TENANT_NAME`, then the NinjaOne organization (`$env:NINJA_ORGANIZATION_NAME`), then the Datto RMM site (`$env:CS_PROFILE_NAME`). A name Evo doesn't know creates the tenant; a likely typo of an existing tenant waits as a pending install until an Evo admin assigns it (Endpoints > Computers > Installs waiting for a customer). The script still reports success, so the RMM doesn't retry.
+
+### NinjaOne
+Store the token in a custom field (e.g. `evoDeploymentToken`) and run the script as SYSTEM:
+```powershell
+.\InstallEvoAgent.ps1 -DeploymentToken evoDeploymentToken -RMM Ninja
+```
+With a Global Deployment Token, each Ninja organization becomes its tenant automatically.
+
+### Datto RMM
+Create a PowerShell component with a site- or account-level variable `EVO_DEPLOYMENT_TOKEN` and run the script with no arguments. With a Global Deployment Token, the Datto site name becomes the tenant.
+
+### N-able N-central
+Add the script to the Script/Software Repository and schedule it against a customer's devices, putting this in **Script Parameters**:
+```
+-DeploymentToken "<token>" -Log
+```
+In an Automation Manager policy, map the token (and, for a Global Deployment Token, a customer-level custom property holding the customer name) to input parameters and pass them to the **Run PowerShell Script** object as `-DeploymentToken` and `-TenantName`.
+
+### ConnectWise Automate
+In a script, set a variable from the client-level Extra Data Field that holds the token (**Variable Set**, name `EvoDeploymentToken`), then run **Execute Script** (PowerShell, as admin):
+```powershell
+& .\InstallEvoAgent.ps1 -DeploymentToken '@EvoDeploymentToken@' -TenantName '%clientname%' -Log
+```
+Check `%clientname%` resolves in your Automate version before rolling out a Global Deployment Token.
+
+### Kaseya VSA
+Create an agent procedure that writes the script file and runs **Execute PowerShell** as System. Read the token from a custom field and use the machine group as the tenant:
+```
+-DeploymentToken "#vSystemInfoManual.EvoDeploymentToken#" -TenantName "#vMachine.groupName#" -Log
+```
+
+### Syncro
+Create a script in the Script library (PowerShell, run as System) with this body. Syncro doesn't put `InstallEvoAgent.ps1` on the endpoint, so the script downloads the pinned copy. Add two Script Variables of type **Platform**: `EvoDeploymentToken` = `{{customer_custom_field_evo_deployment_token}}` and `CustomerBusinessName` = `{{customer_business_name}}`:
+```powershell
+$url = 'https://raw.githubusercontent.com/evosecurity/EvoWindowsAgentDeploymentScripts/v1.1.0/InstallEvoAgent.ps1'
+Invoke-WebRequest $url -OutFile "$env:TEMP\InstallEvoAgent.ps1" -UseBasicParsing
+& "$env:TEMP\InstallEvoAgent.ps1" -DeploymentToken $EvoDeploymentToken -TenantName $CustomerBusinessName -Log
+```
+
+### Microsoft Intune (Platform script)
+Devices > Scripts and remediations > Platform scripts > Add (Windows 10 and later). Platform scripts take no arguments, so upload a wrapper that sets the values and calls the pinned script. Set **Run this script using the logged on credentials** to *No* (runs as SYSTEM) and **Run script in 64 bit PowerShell Host** to *Yes*:
+```powershell
+$env:EVO_DEPLOYMENT_TOKEN = '<token>'
+$env:EVO_TENANT_NAME = '<customer name>'   # only for Global Deployment Tokens
+$url = 'https://raw.githubusercontent.com/evosecurity/EvoWindowsAgentDeploymentScripts/v1.1.0/InstallEvoAgent.ps1'
+Invoke-WebRequest $url -OutFile "$env:TEMP\InstallEvoAgent.ps1" -UseBasicParsing
+& "$env:TEMP\InstallEvoAgent.ps1" -Log
+```
+
+### Group Policy (computer startup script)
+Computer Configuration > Policies > Windows Settings > Scripts > Startup > PowerShell Scripts. Don't put the token in the script parameters: Group Policy stores them in `psscripts.ini` in SYSVOL, which every authenticated user can read. Add this wrapper as the startup script (no parameters) instead. Keep `InstallEvoAgent.ps1` and a `token.txt` holding the deployment token on a share whose ACL grants read to **Domain Computers only**:
+```powershell
+$share = '\\fileserver\evo$'   # readable by Domain Computers only
+$token = (Get-Content "$share\token.txt" -Raw).Trim()
+# -Upgrade refuses a computer with no agent, so pass it only once the agent is installed;
+# then re-runs at each boot don't reinstall the same version.
+$installed = Get-ChildItem HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall |
+    Where-Object { $_.GetValue('DisplayName') -in 'Evo Agent', 'Evo Secure Login' }
+$extra = if ($installed) { @('-Upgrade') } else { @() }
+& "$share\InstallEvoAgent.ps1" -DeploymentToken $token @extra -Log
 ```
 
 ---
